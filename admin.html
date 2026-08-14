@@ -1,0 +1,118 @@
+<!doctype html>
+<html lang="th">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <meta name="theme-color" content="#102a43" />
+  <title>Admin • ตามล่าหาสมบัติ</title>
+  <link rel="stylesheet" href="./assets/style.css" />
+</head>
+<body>
+  <main class="admin-shell">
+    <section id="adminLogin" class="panel login-panel">
+      <p class="eyebrow">ADMIN</p>
+      <h1>ระบบหลังบ้าน</h1>
+      <p class="muted">กรอกรหัสผ่านผู้ดูแลระบบ</p>
+      <div class="form-field" style="margin-top:16px">
+        <label for="adminPassword">รหัสผ่าน</label>
+        <input id="adminPassword" class="input" type="password" autocomplete="current-password" placeholder="รหัสผ่าน Admin">
+      </div>
+      <button id="adminLoginBtn" class="btn primary large full" style="margin-top:12px">เข้าสู่ระบบ</button>
+      <div id="loginMessage" class="message hidden"></div>
+    </section>
+
+    <section id="adminApp" class="hidden">
+      <header class="admin-top">
+        <div class="admin-title">
+          <p class="eyebrow">TREASURE HUNT ADMIN</p>
+          <h1>จัดการเกมตามล่าหาสมบัติ</h1>
+          <p>นักเรียน • ข้อสอบ 43 ป้าย • ผลการเล่น</p>
+        </div>
+        <div class="inline-row">
+          <a class="btn secondary" href="./index.html">หน้าเกม</a>
+          <button id="logoutBtn" class="btn danger">ออกจากระบบ</button>
+        </div>
+      </header>
+
+      <div class="toolbar">
+        <div class="tabs">
+          <button class="tab-btn active" data-tab="students">นักเรียน</button>
+          <button class="tab-btn" data-tab="questions">ข้อสอบ</button>
+          <button class="tab-btn" data-tab="results">ผลการเล่น</button>
+        </div>
+        <div id="adminStatus" class="muted small">พร้อมใช้งาน</div>
+      </div>
+
+      <section id="tab-students" class="panel admin-panel tab-panel">
+        <div class="admin-section-title">
+          <div>
+            <h2>รายชื่อนักเรียน</h2>
+            <div class="muted small">นำเข้าไฟล์ CSV ได้ครั้งละหลายร้อยคน ระบบจะอัปเดตรหัสที่ซ้ำให้</div>
+          </div>
+          <button id="refreshStudentsBtn" class="btn secondary">รีเฟรช</button>
+        </div>
+        <div class="grid-2" style="margin-bottom:14px">
+          <div class="form-field">
+            <label>ไฟล์รายชื่อนักเรียน (.csv)</label>
+            <input id="studentCsv" class="file-input" type="file" accept=".csv,text/csv">
+          </div>
+          <div class="form-field">
+            <label>Template ตัวอย่าง</label>
+            <a class="btn secondary" href="./templates/students-template.csv" download>ดาวน์โหลด students-template.csv</a>
+          </div>
+        </div>
+        <div class="inline-row" style="margin-bottom:14px">
+          <button id="importStudentsBtn" class="btn primary">นำเข้ารายชื่อ</button>
+          <input id="studentSearch" class="input" style="max-width:320px" placeholder="ค้นหารหัส / ชื่อ / ห้อง">
+        </div>
+        <div id="studentsMessage" class="message hidden"></div>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>รหัส</th><th>ชื่อ-สกุล</th><th>ห้อง</th><th>สถานะ</th></tr></thead>
+            <tbody id="studentsBody"></tbody>
+          </table>
+        </div>
+      </section>
+
+      <section id="tab-questions" class="panel admin-panel tab-panel hidden">
+        <div class="admin-section-title">
+          <div>
+            <h2>แก้ไขข้อสอบและคำตอบ</h2>
+            <div class="muted small">แต่ละป้ายมี 3 ข้อ ระบบจะสุ่ม 1 ข้อเมื่อผู้เล่นได้ป้ายนั้น</div>
+          </div>
+          <button id="refreshQuestionsBtn" class="btn secondary">รีเฟรช</button>
+        </div>
+        <div class="notice" style="margin-bottom:14px">หน้าเกมนักเรียนจะแสดงเฉพาะหมายเลขป้ายและตัวเลือก A–D เท่านั้น ข้อความคำถามด้านล่างใช้สำหรับครูตรวจสอบในระบบหลังบ้าน</div>
+        <div class="inline-row" style="margin-bottom:14px">
+          <label for="signSelect" class="muted">เลือกป้าย</label>
+          <select id="signSelect" class="select" style="max-width:180px"></select>
+          <button id="saveQuestionsBtn" class="btn primary">บันทึกป้ายนี้</button>
+        </div>
+        <div id="questionsMessage" class="message hidden"></div>
+        <div id="questionEditor" class="question-editor"></div>
+      </section>
+
+      <section id="tab-results" class="panel admin-panel tab-panel hidden">
+        <div class="admin-section-title">
+          <div>
+            <h2>ผลการเล่น</h2>
+            <div class="muted small">ดูคะแนน หีบที่เปิด และสถานะของผู้เล่น</div>
+          </div>
+          <button id="refreshResultsBtn" class="btn secondary">รีเฟรช</button>
+        </div>
+        <div id="statsGrid" class="stats-grid"></div>
+        <div class="notice" style="margin-bottom:14px">ปุ่ม “รีเซ็ต” จะลบประวัติเกมของนักเรียนคนนั้นทั้งหมด และทำให้สามารถเริ่มเล่นใหม่ได้ ใช้เฉพาะเมื่อครูต้องการแก้ปัญหาเท่านั้น</div>
+        <div id="resultsMessage" class="message hidden"></div>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>รหัส</th><th>ชื่อ-สกุล</th><th>ห้อง</th><th>คะแนน</th><th>ตอบผิด</th><th>หีบ</th><th>สถานะ</th><th>เริ่ม</th><th>จัดการ</th></tr></thead>
+            <tbody id="resultsBody"></tbody>
+          </table>
+        </div>
+      </section>
+    </section>
+  </main>
+
+  <script type="module" src="./admin.js"></script>
+</body>
+</html>
