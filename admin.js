@@ -21,7 +21,7 @@
   function escCSV(v){const s=String(v??"");return /[",\n]/.test(s)?'"'+s.replace(/"/g,'""')+'"':s}
   function fmtDate(v){if(!v)return "-";try{return new Intl.DateTimeFormat("th-TH",{dateStyle:"short",timeStyle:"short"}).format(new Date(v))}catch{return v}}
   function statusBadge(status){
-    const map={playing:["กำลังเล่น","blue"],milestone:["ครบ 10 ข้อ","gold"],finished_small:["จบรับรางวัล","green"],finished_big:["รางวัลใหญ่","gold"]};
+    const map={playing:["กำลังเล่น","blue"],milestone:["ครบ 10 ข้อ","gold"],locked:["ถูกล็อก","red"],finished_small:["จบรับรางวัล","green"],finished_big:["รางวัลใหญ่","gold"]};
     const m=map[status]||["ยังไม่เล่น",""];return `<span class="badge ${m[1]}">${m[0]}</span>`;
   }
   function safe(v){return String(v??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]))}
@@ -184,7 +184,7 @@
     else tb.innerHTML=results.map(r=>`<tr>
       <td><strong>${safe(r.full_name)}</strong><br><span style="color:#6f889a">${safe(r.student_code)}</span></td><td>${safe(r.class_name||"-")}</td>
       <td><strong>${r.correct_count}/25</strong></td><td>${r.total_attempts}</td><td>${statusBadge(r.status)}</td><td>${fmtDate(r.started_at)}</td>
-      <td><button class="row-btn danger reset-player" data-code="${safe(r.student_code)}" data-name="${safe(r.full_name)}">รีเซ็ต</button></td></tr>`).join("");
+      <td><div class="row-actions">${r.status==="locked"?`<button class="row-btn unlock unlock-player" data-code="${safe(r.student_code)}" data-name="${safe(r.full_name)}">ปลดล็อก</button>`:""}<button class="row-btn danger reset-player" data-code="${safe(r.student_code)}" data-name="${safe(r.full_name)}">รีเซ็ต</button></div></td></tr>`).join("");
     $("resultCountLabel").textContent=`แสดง ${results.length} จาก ${total} รายการ`;show($("loadMoreResultsBtn"),results.length<total);
   }
   let resultTimer;
@@ -193,6 +193,19 @@
   $("refreshResultsBtn")?.addEventListener("click",()=>loadResults(true).catch(e=>toast(e.message,"error")));
   $("loadMoreResultsBtn")?.addEventListener("click",()=>loadResults(false).catch(e=>toast(e.message,"error")));
   $("resultsTableBody")?.addEventListener("click",e=>{
+    const unlock=e.target.closest(".unlock-player");
+    if(unlock){
+      openConfirm("ปลดล็อกผู้เล่น",`ปลดล็อก ${unlock.dataset.name} (${unlock.dataset.code}) ใช่หรือไม่? นักเรียนจะเล่นต่อจากข้อเดิม และได้โอกาสตอบข้อนี้ใหม่ 2 ครั้ง`,async()=>{
+        loading(true);
+        try{
+          const d=await arpc("hunt_admin_unlock_student",{p_student_code:unlock.dataset.code});
+          if(!d?.ok)throw new Error(d?.message||"ปลดล็อกไม่สำเร็จ");
+          toast("ปลดล็อกแล้ว นักเรียนเล่นต่อได้");
+          await loadResults(true);await loadStudents(true);await loadDashboard();
+        }catch(err){toast(err.message,"error")}finally{loading(false)}
+      });
+      return;
+    }
     const b=e.target.closest(".reset-player");if(!b)return;
     openConfirm("รีเซ็ตผู้เล่น",`ต้องการรีเซ็ต ${b.dataset.name} (${b.dataset.code}) ใช่หรือไม่? ประวัติการเล่นรอบนี้จะถูกลบและนักเรียนจะเล่นใหม่ได้`,async()=>{
       loading(true);try{const d=await arpc("hunt_admin_reset_student",{p_student_code:b.dataset.code});if(!d?.ok)throw new Error(d?.message||"รีเซ็ตไม่สำเร็จ");toast("รีเซ็ตผู้เล่นแล้ว");await loadResults(true);await loadDashboard()}catch(err){toast(err.message,"error")}finally{loading(false)}

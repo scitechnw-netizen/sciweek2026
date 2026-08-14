@@ -101,21 +101,41 @@
         <div class="sign-target">
           <small>ไปที่ป้ายหมายเลข</small>
           <div id="signNumber" class="sign-number">--</div>
-          <p>อ่านคำถามบนป้าย แล้วเลือกคำตอบที่ถูกต้องด้านล่าง</p>
+          <div class="question-callout">อ่าน <b>คำถามข้อ <span id="questionNumber">--</span></b> บนป้ายนี้</div>
+          <p>อ่านโจทย์ให้ครบก่อน แล้วจึงเลือกคำตอบด้านล่าง</p>
         </div>
 
         <div class="answer-heading">
           <span>เลือกคำตอบ</span>
-          <small>ระบบจะไม่แสดงโจทย์บนหน้าจอนี้</small>
+          <small>เลือก 1 ตัวเลือก แล้วกด “ส่งคำตอบ”</small>
         </div>
+        <div id="attemptWarning" class="attempt-warning hidden"></div>
         <div id="answerGrid" class="answer-grid">
-          <button class="answer-btn" data-option="A"><span>ก</span><b id="optionA">-</b></button>
-          <button class="answer-btn" data-option="B"><span>ข</span><b id="optionB">-</b></button>
-          <button class="answer-btn" data-option="C"><span>ค</span><b id="optionC">-</b></button>
-          <button class="answer-btn" data-option="D"><span>ง</span><b id="optionD">-</b></button>
+          <button type="button" class="answer-btn" data-option="A"><span>ก</span><b id="optionA">-</b></button>
+          <button type="button" class="answer-btn" data-option="B"><span>ข</span><b id="optionB">-</b></button>
+          <button type="button" class="answer-btn" data-option="C"><span>ค</span><b id="optionC">-</b></button>
+          <button type="button" class="answer-btn" data-option="D"><span>ง</span><b id="optionD">-</b></button>
+        </div>
+        <div class="submit-answer-wrap">
+          <div id="selectedAnswerText" class="selected-answer-text">ยังไม่ได้เลือกคำตอบ</div>
+          <button id="submitAnswerBtn" type="button" class="btn btn-gold submit-answer-btn" disabled>ส่งคำตอบ</button>
         </div>
         <div id="answerFeedback" class="answer-feedback hidden"></div>
       </section>
+    </section>
+
+
+    <section id="lockedView" class="locked-card glass-card hidden">
+      <div class="locked-icon">🔒</div>
+      <div class="eyebrow">MISSION LOCKED</div>
+      <h1>ระบบล็อกภารกิจแล้ว</h1>
+      <p>คุณตอบผิดครบ <b>2 ครั้ง</b> ในคำถามเดียว ระบบจึงล็อกเพื่อป้องกันการสุ่มคำตอบ</p>
+      <div class="locked-detail">
+        <div><small>ป้ายหมายเลข</small><strong id="lockedSignNumber">--</strong></div>
+        <div><small>คำถามข้อ</small><strong id="lockedQuestionNumber">--</strong></div>
+      </div>
+      <div class="locked-help">กรุณาติดต่อครูหรือผู้ดูแลระบบเพื่อปลดล็อก แล้วจึงเล่นต่อจากจุดเดิม</div>
+      <button id="retryUnlockBtn" type="button" class="btn btn-primary locked-retry-btn">ตรวจสอบการปลดล็อก</button>
     </section>
 
     <section id="completeView" class="complete-card glass-card hidden">
