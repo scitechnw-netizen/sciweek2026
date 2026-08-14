@@ -3,6 +3,6 @@
 // Project Settings → API
 // ============================================================
 window.TREASURE_CONFIG = {
-  SUPABASE_URL: "https://YOUR_PROJECT_REF.supabase.co",
-  SUPABASE_ANON_KEY: "YOUR_SUPABASE_ANON_OR_PUBLISHABLE_KEY"
+  SUPABASE_URL: "https://uoxlfnsjlyiqeadwsbvg.supabase.co",
+  SUPABASE_ANON_KEY: "sb_publishable_0ziZpEyDJXuIkX80ZEFLHQ_NO2ysBgp"
 };
