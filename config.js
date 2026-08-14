@@ -1,10 +1,8 @@
-// Safe to publish on GitHub Pages ONLY when RLS is enabled as provided in supabase/schema.sql.
-// Copy these values from Supabase Dashboard > Project Settings / API.
-export const SUPABASE_URL = 'https://uoxlfnsjlyiqeadwsbvg.supabase.co';
-export const SUPABASE_PUBLISHABLE_KEY = 'sb_publishable_0ziZpEyDJXuIkX80ZEFLHQ_NO2ysBgp';
-
-export const APP_CONFIG = {
-  title: 'ตามล่าหาสมบัติ',
-  totalQuestions: 25,
-  room: '738',
+// ============================================================
+// ตั้งค่า Supabase ของคุณที่นี่เพียงไฟล์เดียว
+// Project Settings → API
+// ============================================================
+window.TREASURE_CONFIG = {
+  SUPABASE_URL: "https://YOUR_PROJECT_REF.supabase.co",
+  SUPABASE_ANON_KEY: "YOUR_SUPABASE_ANON_OR_PUBLISHABLE_KEY"
 };

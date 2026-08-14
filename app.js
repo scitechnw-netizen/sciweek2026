@@ -1,315 +1,195 @@
-import { supabase } from './supabase-client.js';
-import { APP_CONFIG } from './config.js';
+(() => {
+  "use strict";
+  const $ = (id) => document.getElementById(id);
+  const els = {
+    configError:$("configError"), landing:$("landingView"), lookupForm:$("lookupForm"),
+    studentCode:$("studentCode"), lookupBtn:$("lookupBtn"), lookupResult:$("lookupResult"),
+    lookupMessage:$("lookupMessage"), studentName:$("studentName"), studentClass:$("studentClass"),
+    startBtn:$("startGameBtn"), game:$("gameView"), gameName:$("gameStudentName"),
+    gameClass:$("gameStudentClass"), correct:$("correctCount"), progress:$("progressBar"),
+    roundStat:$("roundStat"), attempts:$("attemptStat"), chestStatus:$("chestStatus"),
+    chestLabel:$("chestLabel"), finishEarly:$("finishEarlyBtn"), missionCounter:$("missionCounter"),
+    signNumber:$("signNumber"), answerGrid:$("answerGrid"), feedback:$("answerFeedback"),
+    options:{A:$("optionA"),B:$("optionB"),C:$("optionC"),D:$("optionD")},
+    complete:$("completeView"), completeTitle:$("completeTitle"), completeText:$("completeText"),
+    finalCorrect:$("finalCorrect"), finalPrize:$("finalPrize"), clearLocal:$("clearLocalBtn"),
+    milestone:$("milestoneModal"), continueBtn:$("continueBtn"), finishAt10:$("finishAt10Btn"),
+    toast:$("toast"), loading:$("loadingOverlay")
+  };
 
-const TOKEN_KEY = 'treasure_hunt_session_token_v1';
+  let pendingStudent = null;
+  let sessionToken = localStorage.getItem("treasure_session_token") || "";
+  let busy = false;
 
-const $ = (id) => document.getElementById(id);
-const setupView = $('setupView');
-const gameView = $('gameView');
-const studentCode = $('studentCode');
-const searchBtn = $('searchBtn');
-const lookupResult = $('lookupResult');
-const setupMessage = $('setupMessage');
-const questionPanel = $('questionPanel');
-const loadingPanel = $('loadingPanel');
-const chestPanel = $('chestPanel');
-const finishPanel = $('finishPanel');
-const choices = $('choices');
-const answerMessage = $('answerMessage');
-
-let lookupStudent = null;
-let busy = false;
-
-function setBusy(value) {
-  busy = value;
-  searchBtn.disabled = value;
-  document.querySelectorAll('button.choice-btn').forEach((b) => (b.disabled = value));
-}
-
-function show(el) { el.classList.remove('hidden'); }
-function hide(el) { el.classList.add('hidden'); }
-
-function setMessage(el, text, type = 'info') {
-  el.textContent = text;
-  el.className = `message ${type}`;
-  show(el);
-}
-function clearMessage(el) { hide(el); el.textContent = ''; }
-
-function setGameHeader(state) {
-  if (state?.student) {
-    $('playerName').textContent = state.student.name || '-';
-    $('playerClass').textContent = state.student.className ? ` • ${state.student.className}` : '';
+  function show(el, yes=true){ if (!el) return; el.classList.toggle("hidden", !yes); }
+  function loading(yes){ show(els.loading, yes); }
+  function message(el, text, type="error"){
+    el.textContent = text; el.className = "inline-alert " + (type === "success" ? "success" : "");
+    show(el, true);
   }
-  const score = Number(state?.score || 0);
-  $('scoreValue').textContent = score;
-  $('chestValue').textContent = Number(state?.chestsOpened || 0);
-  $('progressFill').style.width = `${Math.min(100, (score / APP_CONFIG.totalQuestions) * 100)}%`;
-}
+  function toast(text, type="success"){
+    els.toast.textContent = text; els.toast.className = "toast " + type; show(els.toast,true);
+    clearTimeout(toast.t); toast.t=setTimeout(()=>show(els.toast,false),2600);
+  }
+  function safeText(v){ return v == null ? "" : String(v); }
+  function pretty(v){
+    return safeText(v)
+      .replace(/\$\\text\{CO\}\\_2\$/g,"CO₂")
+      .replace(/\$\\text\{CH\}\\_4\$/g,"CH₄")
+      .replace(/\$\\text\{N\}\\_2\\text\{O\}\$/g,"N₂O")
+      .replace(/\$\\text\{O\}\\_2\$/g,"O₂")
+      .replace(/\$\\Omega\$/g,"Ω")
+      .replace(/\$E = mc\^2\$/g,"E = mc²")
+      .replace(/\$F = ma\$/g,"F = ma")
+      .replace(/\$V = IR\$/g,"V = IR")
+      .replace(/\$P = IV\$/g,"P = IV")
+      .replace(/\$\\pi\$/g,"π")
+      .replace(/\$\\rightarrow\$/g,"→");
+  }
+  async function rpc(name,args={}){
+    if (!window.treasureDB) throw new Error("ยังไม่ได้ตั้งค่า Supabase");
+    const {data,error}=await window.treasureDB.rpc(name,args);
+    if(error) throw new Error(error.message || "เชื่อมต่อฐานข้อมูลไม่สำเร็จ");
+    return data;
+  }
+  function normalizeState(data){ return data && data.state ? data.state : data; }
 
-function enterGame() {
-  hide(setupView);
-  show(gameView);
-}
+  async function restore(){
+    if(!sessionToken) return;
+    try{
+      loading(true);
+      const data=await rpc("hunt_get_state",{p_token:sessionToken});
+      if(data && data.ok === false) throw new Error(data.message || "ไม่พบเซสชัน");
+      renderState(normalizeState(data));
+    }catch(e){
+      localStorage.removeItem("treasure_session_token"); sessionToken="";
+      show(els.landing,true); show(els.game,false); show(els.complete,false);
+    }finally{loading(false)}
+  }
 
-function showLoading() {
-  hide(questionPanel); hide(chestPanel); hide(finishPanel); show(loadingPanel);
-}
-
-async function rpc(name, args = {}) {
-  const { data, error } = await supabase.rpc(name, args);
-  if (error) throw error;
-  return data;
-}
-
-async function lookup() {
-  if (busy) return;
-  const code = studentCode.value.trim();
-  if (!code) return setMessage(setupMessage, 'กรุณากรอกรหัสนักเรียน', 'error');
-
-  clearMessage(setupMessage);
-  hide(lookupResult);
-  setBusy(true);
-  searchBtn.textContent = 'กำลังค้นหา...';
-  try {
-    const data = await rpc('lookup_student', { p_student_code: code });
-    if (!data?.found) {
-      lookupStudent = null;
-      return setMessage(setupMessage, data?.message || 'ไม่พบรหัสนักเรียน', 'error');
+  function renderState(s){
+    if(!s) return;
+    show(els.landing,false);
+    if(s.status==="finished_small" || s.status==="finished_big"){
+      renderComplete(s); return;
     }
-
-    lookupStudent = data;
-    lookupResult.innerHTML = `
-      <div class="student-found">
-        <div class="student-avatar">🧭</div>
-        <div class="student-info">
-          <span class="mini-label">พบข้อมูลนักเรียน</span>
-          <strong>${escapeHtml(data.name || '')}</strong>
-          <span>${escapeHtml(data.className || '')}</span>
-        </div>
-      </div>
-      ${data.eligible
-        ? '<button id="startBtn" class="btn primary large full">เริ่มเกม</button>'
-        : `<div class="message error">${escapeHtml(data.message || 'รหัสนี้เล่นแล้ว')}</div>`}
-    `;
-    show(lookupResult);
-    if (data.eligible) $('startBtn').addEventListener('click', startGame);
-  } catch (err) {
-    console.error(err);
-    setMessage(setupMessage, 'เชื่อมต่อระบบไม่ได้ กรุณาลองอีกครั้ง', 'error');
-  } finally {
-    setBusy(false);
-    searchBtn.textContent = 'ค้นหา';
-  }
-}
-
-async function startGame() {
-  if (busy || !lookupStudent?.eligible) return;
-  setBusy(true);
-  try {
-    const data = await rpc('start_game', { p_student_code: lookupStudent.studentCode });
-    if (!data?.ok) {
-      return setMessage(setupMessage, data?.message || 'ไม่สามารถเริ่มเกมได้', 'error');
+    show(els.game,true); show(els.complete,false);
+    els.gameName.textContent=s.student_name || "-";
+    els.gameClass.textContent=s.class_name || "";
+    const c=Number(s.correct_count||0), round=Number(s.current_round||Math.min(c+1,25));
+    els.correct.textContent=c;
+    els.progress.style.width=Math.min(100,(c/25)*100)+"%";
+    els.roundStat.textContent=Math.min(round,25)+"/25";
+    els.attempts.textContent=Number(s.total_attempts||0);
+    els.missionCounter.textContent="MISSION "+String(Math.min(round,25)).padStart(2,"0")+" / 25";
+    if(c>=10){
+      els.chestStatus.classList.remove("locked"); els.chestStatus.classList.add("unlocked");
+      els.chestLabel.textContent="ปลดล็อกแล้ว";
+      show(els.finishEarly, s.status==="playing");
+    }else{
+      els.chestStatus.classList.add("locked"); els.chestStatus.classList.remove("unlocked");
+      els.chestLabel.textContent="อีก "+(10-c)+" ข้อเพื่อปลดล็อก";
+      show(els.finishEarly,false);
     }
-    localStorage.setItem(TOKEN_KEY, data.sessionToken);
-    enterGame();
-    setGameHeader({ student: data.student, score: 0, chestsOpened: 0 });
-    await loadNextQuestion();
-  } catch (err) {
-    console.error(err);
-    setMessage(setupMessage, 'เริ่มเกมไม่สำเร็จ กรุณาลองอีกครั้ง', 'error');
-  } finally {
-    setBusy(false);
-  }
-}
-
-function renderQuestion(q) {
-  hide(loadingPanel); hide(chestPanel); hide(finishPanel); show(questionPanel);
-  clearMessage(answerMessage);
-  $('signNumber').textContent = q.signNumber;
-  $('roundNumber').textContent = q.sequence;
-  choices.innerHTML = '';
-
-  for (const choice of q.choices || []) {
-    const btn = document.createElement('button');
-    btn.className = 'choice-btn';
-    btn.type = 'button';
-    btn.innerHTML = `<span class="choice-key">${choice.key}</span><span>${escapeHtml(choice.text)}</span>`;
-    btn.addEventListener('click', () => submitAnswer(choice.key));
-    choices.appendChild(btn);
-  }
-}
-
-async function loadNextQuestion() {
-  const token = localStorage.getItem(TOKEN_KEY);
-  if (!token) return resetToLogin();
-  showLoading();
-  try {
-    const data = await rpc('next_question', { p_session_token: token });
-    if (!data?.ok) {
-      if (data?.error === 'chest_action_required') return restoreState();
-      throw new Error(data?.message || data?.error || 'next_question_failed');
+    if(s.status==="milestone"){
+      show(els.milestone,true); return;
     }
-    renderQuestion(data.question);
-  } catch (err) {
-    console.error(err);
-    hide(loadingPanel); show(questionPanel);
-    setMessage(answerMessage, 'สุ่มคำถามไม่สำเร็จ กรุณารีเฟรชหน้าเว็บ หรือติดต่อครูผู้ดูแล', 'error');
-  }
-}
-
-async function submitAnswer(option) {
-  if (busy) return;
-  const token = localStorage.getItem(TOKEN_KEY);
-  if (!token) return resetToLogin();
-  setBusy(true);
-  document.querySelectorAll('.choice-btn').forEach((b) => (b.disabled = true));
-  clearMessage(answerMessage);
-
-  try {
-    const data = await rpc('submit_answer', { p_session_token: token, p_selected_option: option });
-    if (!data?.ok) {
-      if (data?.error === 'chest_action_required') return restoreState();
-      throw new Error(data?.error || 'submit_failed');
+    show(els.milestone,false);
+    if(s.current){
+      els.signNumber.textContent=s.current.sign_number;
+      ["A","B","C","D"].forEach(k=>els.options[k].textContent=pretty(s.current.options[k]));
     }
-
-    if (!data.correct) {
-      setMessage(answerMessage, '❌ ยังไม่ถูก ลองอีกครั้ง', 'error');
-      document.querySelectorAll('.choice-btn').forEach((b) => (b.disabled = false));
-      return;
-    }
-
-    setGameHeader({ score: data.score, chestsOpened: data.chestsOpened ?? Number($('chestValue').textContent) });
-    setMessage(answerMessage, '✅ ตอบถูก!', 'success');
-
-    if (data.finished) {
-      setTimeout(() => showFinish(data), 500);
-      return;
-    }
-
-    if (data.milestone) {
-      setTimeout(() => showChest(data.score, data.chestNumber), 500);
-      return;
-    }
-
-    setTimeout(loadNextQuestion, 650);
-  } catch (err) {
-    console.error(err);
-    setMessage(answerMessage, 'ส่งคำตอบไม่สำเร็จ กรุณาลองอีกครั้ง', 'error');
-    document.querySelectorAll('.choice-btn').forEach((b) => (b.disabled = false));
-  } finally {
-    setBusy(false);
   }
-}
 
-function showChest(score, chestNumber) {
-  hide(questionPanel); hide(loadingPanel); hide(finishPanel); show(chestPanel);
-  $('milestoneScore').textContent = score;
-  $('milestoneChest').textContent = chestNumber;
-  $('scoreValue').textContent = score;
-  $('chestValue').textContent = chestNumber;
-}
-
-async function continueGame() {
-  if (busy) return;
-  const token = localStorage.getItem(TOKEN_KEY);
-  setBusy(true);
-  $('continueBtn').disabled = true;
-  $('finishBtn').disabled = true;
-  try {
-    const data = await rpc('continue_game', { p_session_token: token });
-    if (!data?.ok) throw new Error(data?.error || 'continue_failed');
-    await loadNextQuestion();
-  } catch (err) {
-    console.error(err);
-    alert('ไม่สามารถเล่นต่อได้ กรุณาลองอีกครั้ง');
-  } finally {
-    setBusy(false);
-    $('continueBtn').disabled = false;
-    $('finishBtn').disabled = false;
+  function renderComplete(s){
+    show(els.landing,false); show(els.game,false); show(els.milestone,false); show(els.complete,true);
+    const big=s.status==="finished_big";
+    els.completeTitle.textContent=big ? "พิชิตรางวัลใหญ่สำเร็จ!" : "ยินดีด้วย!";
+    els.completeText.textContent=big
+      ? "คุณตอบคำถามครบ 25 ข้อ และทำภารกิจตามล่าหาสมบัติสำเร็จ"
+      : "คุณปลดล็อกหีบสมบัติและเลือกจบภารกิจเรียบร้อยแล้ว";
+    els.finalCorrect.textContent=s.correct_count || 0;
+    els.finalPrize.textContent=big ? "รางวัลใหญ่" : "หีบสมบัติ";
   }
-}
 
-async function finishGame() {
-  if (busy) return;
-  const token = localStorage.getItem(TOKEN_KEY);
-  if (!confirm('ยืนยันจบเกมใช่หรือไม่? เมื่อจบแล้วจะกลับมาเล่นต่อไม่ได้')) return;
-  setBusy(true);
-  $('continueBtn').disabled = true;
-  $('finishBtn').disabled = true;
-  try {
-    const data = await rpc('finish_game', { p_session_token: token });
-    if (!data?.ok) throw new Error(data?.message || data?.error || 'finish_failed');
-    showFinish(data);
-  } catch (err) {
-    console.error(err);
-    alert(err.message || 'จบเกมไม่สำเร็จ');
-  } finally {
-    setBusy(false);
-    $('continueBtn').disabled = false;
-    $('finishBtn').disabled = false;
+  els.lookupForm?.addEventListener("submit",async(e)=>{
+    e.preventDefault(); if(busy) return;
+    const code=els.studentCode.value.trim(); if(!code) return;
+    busy=true; els.lookupBtn.disabled=true; show(els.lookupMessage,false); show(els.lookupResult,false);
+    try{
+      const data=await rpc("hunt_lookup_student",{p_student_code:code});
+      if(!data?.found){
+        message(els.lookupMessage,data?.message||"ไม่พบรหัสนักเรียน");
+        pendingStudent=null; return;
+      }
+      if(data.already_played){
+        message(els.lookupMessage,"รหัสนี้เริ่มภารกิจไปแล้ว หากเป็นการเล่นค้างจากเครื่องเดิม ให้เปิดหน้าเดิมอีกครั้ง หรือติดต่อผู้ดูแลระบบ");
+        pendingStudent=null; return;
+      }
+      pendingStudent={code,full_name:data.full_name,class_name:data.class_name||""};
+      els.studentName.textContent=data.full_name; els.studentClass.textContent=data.class_name||"";
+      show(els.lookupResult,true);
+    }catch(err){message(els.lookupMessage,err.message)}
+    finally{busy=false; els.lookupBtn.disabled=false}
+  });
+
+  els.startBtn?.addEventListener("click",async()=>{
+    if(!pendingStudent || busy) return;
+    busy=true; loading(true);
+    try{
+      const data=await rpc("hunt_start_game",{p_student_code:pendingStudent.code});
+      if(!data?.ok) throw new Error(data?.message||"เริ่มเกมไม่สำเร็จ");
+      sessionToken=data.token; localStorage.setItem("treasure_session_token",sessionToken);
+      renderState(data.state);
+    }catch(err){message(els.lookupMessage,err.message)}
+    finally{busy=false;loading(false)}
+  });
+
+  els.answerGrid?.addEventListener("click",async(e)=>{
+    const btn=e.target.closest(".answer-btn"); if(!btn || busy || !sessionToken) return;
+    busy=true; [...els.answerGrid.querySelectorAll(".answer-btn")].forEach(b=>b.disabled=true);
+    show(els.feedback,false);
+    try{
+      const option=btn.dataset.option;
+      const data=await rpc("hunt_submit_answer",{p_token:sessionToken,p_option:option});
+      if(!data?.ok) throw new Error(data?.message||"ส่งคำตอบไม่สำเร็จ");
+      if(data.correct){
+        btn.classList.add("correct");
+        els.feedback.textContent="ถูกต้อง! กำลังเปิดภารกิจถัดไป...";
+        els.feedback.className="answer-feedback good"; show(els.feedback,true);
+        setTimeout(()=>{ btn.classList.remove("correct"); show(els.feedback,false); renderState(data.state); },600);
+      }else{
+        btn.classList.add("wrong");
+        els.feedback.textContent="ยังไม่ถูก ลองตรวจคำถามบนป้ายอีกครั้ง";
+        els.feedback.className="answer-feedback bad"; show(els.feedback,true);
+        setTimeout(()=>btn.classList.remove("wrong"),500);
+        renderState(data.state);
+      }
+    }catch(err){toast(err.message,"error")}
+    finally{busy=false; [...els.answerGrid.querySelectorAll(".answer-btn")].forEach(b=>b.disabled=false)}
+  });
+
+  els.continueBtn?.addEventListener("click",async()=>{
+    if(busy)return; busy=true; loading(true);
+    try{const d=await rpc("hunt_continue",{p_token:sessionToken}); if(!d?.ok)throw new Error(d?.message||"ดำเนินการไม่ได้"); renderState(d.state)}
+    catch(e){toast(e.message,"error")}finally{busy=false;loading(false)}
+  });
+  async function finishGame(){
+    if(busy)return; busy=true; loading(true);
+    try{const d=await rpc("hunt_finish_game",{p_token:sessionToken}); if(!d?.ok)throw new Error(d?.message||"จบเกมไม่ได้"); renderState(d.state)}
+    catch(e){toast(e.message,"error")}finally{busy=false;loading(false)}
   }
-}
+  els.finishAt10?.addEventListener("click",finishGame);
+  els.finishEarly?.addEventListener("click",()=>{
+    if(confirm("ยืนยันจบภารกิจตอนนี้หรือไม่? เมื่อจบแล้วจะไม่สามารถกลับมาเล่นต่อได้")) finishGame();
+  });
+  els.clearLocal?.addEventListener("click",()=>{
+    localStorage.removeItem("treasure_session_token"); sessionToken=""; location.href="./index.html";
+  });
 
-function showFinish(data) {
-  hide(questionPanel); hide(loadingPanel); hide(chestPanel); show(finishPanel);
-  const big = Boolean(data.bigReward);
-  $('finishIcon').textContent = big ? '🏆' : '🎉';
-  $('finishTitle').textContent = big ? 'สุดยอด! คุณพิชิตรางวัลใหญ่' : 'ยินดีด้วย! ภารกิจสำเร็จ';
-  $('finishText').innerHTML = big
-    ? `คุณตอบคำถามถูกครบ <b>25 ข้อ</b><br>ได้รับสิทธิ์รับ <b>รางวัลใหญ่</b>`
-    : `คุณจบเกมด้วยคะแนน <b>${Number(data.score || 0)} ข้อ</b><br>และเปิดหีบสมบัติได้ <b>${Number(data.chestsOpened || 0)} หีบ</b>`;
-  $('scoreValue').textContent = Number(data.score || 0);
-  if (data.chestsOpened != null) $('chestValue').textContent = Number(data.chestsOpened || 0);
-}
-
-async function restoreState() {
-  const token = localStorage.getItem(TOKEN_KEY);
-  if (!token) return;
-  enterGame();
-  showLoading();
-  try {
-    const data = await rpc('get_game_state', { p_session_token: token });
-    if (!data?.ok) {
-      localStorage.removeItem(TOKEN_KEY);
-      return resetToLogin();
-    }
-    setGameHeader(data);
-    if (data.finished || data.status !== 'active') return showFinish(data);
-    if (data.awaitingChest) return showChest(data.score, data.chestNumber || data.chestsOpened);
-    if (data.question) return renderQuestion(data.question);
-    await loadNextQuestion();
-  } catch (err) {
-    console.error(err);
-    hide(loadingPanel);
-    show(questionPanel);
-    setMessage(answerMessage, 'เชื่อมต่อเกมเดิมไม่ได้ กรุณารีเฟรชอีกครั้ง', 'error');
+  if(window.TREASURE_CONFIG_ERROR){
+    show(els.configError,true); show(els.landing,false);
+  }else{
+    restore();
   }
-}
-
-function resetToLogin() {
-  localStorage.removeItem(TOKEN_KEY);
-  hide(gameView);
-  show(setupView);
-  hide(lookupResult);
-  lookupStudent = null;
-  studentCode.value = '';
-  clearMessage(setupMessage);
-}
-
-function escapeHtml(value) {
-  return String(value ?? '')
-    .replaceAll('&', '&amp;')
-    .replaceAll('<', '&lt;')
-    .replaceAll('>', '&gt;')
-    .replaceAll('"', '&quot;')
-    .replaceAll("'", '&#039;');
-}
-
-searchBtn.addEventListener('click', lookup);
-studentCode.addEventListener('keydown', (e) => { if (e.key === 'Enter') lookup(); });
-$('continueBtn').addEventListener('click', continueGame);
-$('finishBtn').addEventListener('click', finishGame);
-$('leaveDeviceBtn').addEventListener('click', resetToLogin);
-
-restoreState();
+})();

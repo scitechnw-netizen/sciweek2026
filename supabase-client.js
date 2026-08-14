@@ -1,10 +1,17 @@
-import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm';
-import { SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY } from './config.js';
-
-if (SUPABASE_URL.includes('YOUR_PROJECT_REF') || SUPABASE_PUBLISHABLE_KEY.includes('YOUR_SUPABASE')) {
-  console.warn('Please configure Supabase in config.js before using the app.');
-}
-
-export const supabase = createClient(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY, {
-  auth: { persistSession: false, autoRefreshToken: false },
-});
+(() => {
+  const cfg = window.TREASURE_CONFIG || {};
+  const url = String(cfg.SUPABASE_URL || "").trim();
+  const key = String(cfg.SUPABASE_ANON_KEY || "").trim();
+  const bad = !url || !key || url.includes("YOUR_PROJECT_REF") || key.includes("YOUR_SUPABASE");
+  window.TREASURE_CONFIG_ERROR = bad;
+  if (bad) return;
+  if (!window.supabase || typeof window.supabase.createClient !== "function") {
+    window.TREASURE_CONFIG_ERROR = true;
+    window.TREASURE_CONFIG_MESSAGE = "โหลด Supabase JavaScript library ไม่สำเร็จ";
+    return;
+  }
+  window.treasureDB = window.supabase.createClient(url, key, {
+    auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false },
+    global: { headers: { "x-client-info": "science-treasure-hunt/2.0" } }
+  });
+})();

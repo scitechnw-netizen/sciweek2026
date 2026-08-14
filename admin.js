@@ -1,323 +1,229 @@
-import { supabase } from './supabase-client.js';
+(() => {
+  "use strict";
+  const $=id=>document.getElementById(id);
+  const loginView=$("adminLoginView"), app=$("adminApp"), loginForm=$("adminLoginForm"), loginMsg=$("adminLoginMessage"),
+        loadingEl=$("adminLoading"), toastEl=$("adminToast"), sidebar=document.querySelector(".admin-sidebar");
+  let adminToken=sessionStorage.getItem("treasure_admin_token")||"";
+  let students=[],questions=[],results=[],csvRows=[],studentOffset=0,resultOffset=0;
+  let confirmAction=null;
 
-const ADMIN_KEY = 'treasure_hunt_admin_password_v1';
-const $ = (id) => document.getElementById(id);
-let adminPassword = sessionStorage.getItem(ADMIN_KEY) || '';
-let students = [];
-let questions = [];
-let results = [];
+  function show(el,yes=true){if(el)el.classList.toggle("hidden",!yes)}
+  function loading(v){show(loadingEl,v)}
+  function toast(t,type="success"){toastEl.textContent=t;toastEl.className="toast "+type;show(toastEl,true);clearTimeout(toast.t);toast.t=setTimeout(()=>show(toastEl,false),2600)}
+  function msg(el,t,ok=false){el.textContent=t;el.className="inline-alert "+(ok?"success":"");show(el,true)}
+  async function rpc(name,args={}){
+    if(!window.treasureDB)throw new Error("ยังไม่ได้ตั้งค่า Supabase");
+    const {data,error}=await window.treasureDB.rpc(name,args);
+    if(error)throw new Error(error.message||"เชื่อมต่อฐานข้อมูลไม่สำเร็จ");
+    return data;
+  }
+  async function arpc(name,args={}){return rpc(name,{p_admin_token:adminToken,...args})}
+  function escCSV(v){const s=String(v??"");return /[",\n]/.test(s)?'"'+s.replace(/"/g,'""')+'"':s}
+  function fmtDate(v){if(!v)return "-";try{return new Intl.DateTimeFormat("th-TH",{dateStyle:"short",timeStyle:"short"}).format(new Date(v))}catch{return v}}
+  function statusBadge(status){
+    const map={playing:["กำลังเล่น","blue"],milestone:["ครบ 10 ข้อ","gold"],finished_small:["จบรับรางวัล","green"],finished_big:["รางวัลใหญ่","gold"]};
+    const m=map[status]||["ยังไม่เล่น",""];return `<span class="badge ${m[1]}">${m[0]}</span>`;
+  }
+  function safe(v){return String(v??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]))}
 
-function show(el) { el.classList.remove('hidden'); }
-function hide(el) { el.classList.add('hidden'); }
-function msg(el, text, type = 'info') { el.textContent = text; el.className = `message ${type}`; show(el); }
-function clearMsg(el) { el.textContent = ''; hide(el); }
-function status(text) { $('adminStatus').textContent = text; }
-function escapeHtml(value) {
-  return String(value ?? '')
-    .replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;')
-    .replaceAll('"', '&quot;').replaceAll("'", '&#039;');
-}
-function escapeAttr(value) { return escapeHtml(value).replaceAll('\n', '&#10;'); }
-
-async function callAdmin(action, payload = {}) {
-  const { data, error } = await supabase.functions.invoke('admin-api', {
-    body: { action, ...payload },
-    headers: { 'x-admin-password': adminPassword },
+  async function doLogin(password){
+    const d=await rpc("hunt_admin_login",{p_password:password});
+    if(!d?.ok)throw new Error(d?.message||"รหัสผ่านไม่ถูกต้อง");
+    adminToken=d.token;sessionStorage.setItem("treasure_admin_token",adminToken);show(loginView,false);show(app,true);await loadDashboard();
+  }
+  loginForm?.addEventListener("submit",async e=>{
+    e.preventDefault();show(loginMsg,false);loading(true);
+    try{await doLogin($("adminPassword").value)}
+    catch(err){msg(loginMsg,err.message)}
+    finally{loading(false)}
   });
-  if (error) throw error;
-  if (!data?.ok) throw new Error(data?.message || data?.error || 'Admin API error');
-  return data;
-}
 
-async function login(password) {
-  adminPassword = password.trim();
-  if (!adminPassword) return msg($('loginMessage'), 'กรุณากรอกรหัสผ่าน', 'error');
-  $('adminLoginBtn').disabled = true;
-  $('adminLoginBtn').textContent = 'กำลังเข้าสู่ระบบ...';
-  clearMsg($('loginMessage'));
-  try {
-    await callAdmin('login');
-    sessionStorage.setItem(ADMIN_KEY, adminPassword);
-    hide($('adminLogin')); show($('adminApp'));
-    await loadStudents();
-  } catch (err) {
-    console.error(err);
-    adminPassword = '';
-    sessionStorage.removeItem(ADMIN_KEY);
-    msg($('loginMessage'), 'รหัสผ่านไม่ถูกต้อง หรือเชื่อมต่อระบบไม่ได้', 'error');
-  } finally {
-    $('adminLoginBtn').disabled = false;
-    $('adminLoginBtn').textContent = 'เข้าสู่ระบบ';
+  async function validateSession(){
+    if(!adminToken)return false;
+    try{const d=await arpc("hunt_admin_dashboard");if(!d?.ok)return false;renderDashboard(d);return true}catch{return false}
   }
-}
 
-function logout() {
-  adminPassword = '';
-  sessionStorage.removeItem(ADMIN_KEY);
-  hide($('adminApp')); show($('adminLogin'));
-  $('adminPassword').value = '';
-}
-
-function switchTab(tab) {
-  document.querySelectorAll('.tab-btn').forEach((b) => b.classList.toggle('active', b.dataset.tab === tab));
-  document.querySelectorAll('.tab-panel').forEach((p) => hide(p));
-  show($(`tab-${tab}`));
-  if (tab === 'students') loadStudents();
-  if (tab === 'questions') loadQuestions();
-  if (tab === 'results') loadResults();
-}
-
-async function loadStudents() {
-  status('กำลังโหลดรายชื่อนักเรียน...');
-  try {
-    const data = await callAdmin('students.list');
-    students = data.rows || [];
-    renderStudents();
-    status(`นักเรียน ${students.length.toLocaleString('th-TH')} คน`);
-  } catch (err) {
-    console.error(err); msg($('studentsMessage'), 'โหลดรายชื่อไม่สำเร็จ', 'error'); status('เกิดข้อผิดพลาด');
-  }
-}
-
-function renderStudents() {
-  const q = $('studentSearch').value.trim().toLowerCase();
-  const rows = students.filter((s) => {
-    const hay = `${s.student_code} ${s.prefix} ${s.first_name} ${s.last_name} ${s.class_name}`.toLowerCase();
-    return !q || hay.includes(q);
-  });
-  $('studentsBody').innerHTML = rows.map((s) => `
-    <tr>
-      <td><b>${escapeHtml(s.student_code)}</b></td>
-      <td>${escapeHtml([s.prefix, s.first_name, s.last_name].filter(Boolean).join(' '))}</td>
-      <td>${escapeHtml(s.class_name || '-')}</td>
-      <td><span class="status-pill ${s.is_active ? 'completed' : 'ended'}">${s.is_active ? 'ใช้งาน' : 'ปิดใช้งาน'}</span></td>
-    </tr>`).join('') || '<tr><td colspan="4" class="muted">ไม่พบข้อมูล</td></tr>';
-}
-
-function parseCSV(text) {
-  const rows = [];
-  let row = [], field = '', quoted = false;
-  const src = text.replace(/^\uFEFF/, '');
-  for (let i = 0; i < src.length; i++) {
-    const c = src[i];
-    if (quoted) {
-      if (c === '"' && src[i + 1] === '"') { field += '"'; i++; }
-      else if (c === '"') quoted = false;
-      else field += c;
-    } else {
-      if (c === '"') quoted = true;
-      else if (c === ',') { row.push(field); field = ''; }
-      else if (c === '\n') { row.push(field.replace(/\r$/, '')); rows.push(row); row = []; field = ''; }
-      else field += c;
-    }
-  }
-  if (field.length || row.length) { row.push(field.replace(/\r$/, '')); rows.push(row); }
-  return rows.filter((r) => r.some((v) => String(v).trim() !== ''));
-}
-
-function normalizeHeader(h) { return String(h ?? '').trim().toLowerCase().replaceAll(' ', '_'); }
-function headerIndex(headers, names) {
-  const normalized = headers.map(normalizeHeader);
-  for (const name of names) {
-    const i = normalized.indexOf(normalizeHeader(name));
-    if (i >= 0) return i;
-  }
-  return -1;
-}
-
-async function importStudents() {
-  const file = $('studentCsv').files?.[0];
-  if (!file) return msg($('studentsMessage'), 'กรุณาเลือกไฟล์ CSV ก่อน', 'error');
-  $('importStudentsBtn').disabled = true;
-  clearMsg($('studentsMessage'));
-  try {
-    const parsed = parseCSV(await file.text());
-    if (parsed.length < 2) throw new Error('ไฟล์ไม่มีข้อมูลนักเรียน');
-    const headers = parsed[0];
-    const idx = {
-      student_code: headerIndex(headers, ['student_code', 'รหัสนักเรียน', 'รหัส']),
-      prefix: headerIndex(headers, ['prefix', 'คำนำหน้า']),
-      first_name: headerIndex(headers, ['first_name', 'ชื่อ']),
-      last_name: headerIndex(headers, ['last_name', 'นามสกุล']),
-      class_name: headerIndex(headers, ['class_name', 'ห้อง', 'ชั้น', 'ชั้นเรียน']),
-    };
-    if (idx.student_code < 0 || idx.first_name < 0) throw new Error('ต้องมีคอลัมน์ student_code และ first_name');
-
-    const dataRows = parsed.slice(1).map((r) => ({
-      student_code: String(r[idx.student_code] ?? '').trim(),
-      prefix: idx.prefix >= 0 ? String(r[idx.prefix] ?? '').trim() : '',
-      first_name: String(r[idx.first_name] ?? '').trim(),
-      last_name: idx.last_name >= 0 ? String(r[idx.last_name] ?? '').trim() : '',
-      class_name: idx.class_name >= 0 ? String(r[idx.class_name] ?? '').trim() : '',
-      is_active: true,
-    })).filter((r) => r.student_code && r.first_name);
-
-    if (!dataRows.length) throw new Error('ไม่พบข้อมูลที่นำเข้าได้');
-    let imported = 0;
-    for (let i = 0; i < dataRows.length; i += 500) {
-      const chunk = dataRows.slice(i, i + 500);
-      status(`กำลังนำเข้า ${Math.min(i + chunk.length, dataRows.length)}/${dataRows.length}...`);
-      const res = await callAdmin('students.upsert', { rows: chunk });
-      imported += Number(res.count || chunk.length);
-    }
-    msg($('studentsMessage'), `นำเข้าหรืออัปเดตสำเร็จ ${imported.toLocaleString('th-TH')} คน`, 'success');
-    $('studentCsv').value = '';
-    await loadStudents();
-  } catch (err) {
-    console.error(err); msg($('studentsMessage'), err.message || 'นำเข้าไม่สำเร็จ', 'error');
-  } finally {
-    $('importStudentsBtn').disabled = false;
-  }
-}
-
-function populateSignSelect() {
-  if ($('signSelect').options.length) return;
-  $('signSelect').innerHTML = Array.from({ length: 43 }, (_, i) => `<option value="${i + 1}">ป้าย ${i + 1}</option>`).join('');
-}
-
-async function loadQuestions() {
-  populateSignSelect();
-  status('กำลังโหลดข้อสอบ...');
-  clearMsg($('questionsMessage'));
-  try {
-    const data = await callAdmin('questions.list');
-    questions = data.rows || [];
-    renderQuestionEditor();
-    const active = questions.filter((q) => q.is_active).length;
-    status(`เปิดใช้ ${active}/129 ข้อ`);
-  } catch (err) {
-    console.error(err); msg($('questionsMessage'), 'โหลดข้อสอบไม่สำเร็จ', 'error'); status('เกิดข้อผิดพลาด');
-  }
-}
-
-function renderQuestionEditor() {
-  const sign = Number($('signSelect').value || 1);
-  const rows = [1, 2, 3].map((slot) => questions.find((q) => Number(q.sign_number) === sign && Number(q.question_slot) === slot) || {
-    sign_number: sign, question_slot: slot, question_text: '', option_a: '', option_b: '', option_c: '', option_d: '', correct_option: 'A', is_active: false,
-  });
-  $('questionEditor').innerHTML = rows.map((q) => `
-    <article class="question-card" data-slot="${q.question_slot}">
-      <div class="question-card-head">
-        <strong>ป้าย ${q.sign_number} • คำถามที่ ${q.question_slot}</strong>
-        <label class="checkbox-row"><input class="q-active" type="checkbox" ${q.is_active ? 'checked' : ''}> เปิดใช้งาน</label>
-      </div>
-      <div class="form-field">
-        <label>ข้อความคำถาม (สำหรับครูตรวจสอบ — ไม่แสดงในหน้าเกม)</label>
-        <textarea class="textarea q-text" placeholder="พิมพ์คำถามที่ติดอยู่บนป้าย...">${escapeHtml(q.question_text || '')}</textarea>
-      </div>
-      <div class="options-grid" style="margin-top:10px">
-        <div class="form-field"><label>ตัวเลือก A</label><input class="input q-a" value="${escapeAttr(q.option_a || '')}"></div>
-        <div class="form-field"><label>ตัวเลือก B</label><input class="input q-b" value="${escapeAttr(q.option_b || '')}"></div>
-        <div class="form-field"><label>ตัวเลือก C</label><input class="input q-c" value="${escapeAttr(q.option_c || '')}"></div>
-        <div class="form-field"><label>ตัวเลือก D</label><input class="input q-d" value="${escapeAttr(q.option_d || '')}"></div>
-      </div>
-      <div class="form-field" style="margin-top:10px;max-width:220px">
-        <label>คำตอบที่ถูกต้อง</label>
-        <select class="select q-correct">
-          ${['A','B','C','D'].map((x) => `<option value="${x}" ${q.correct_option === x ? 'selected' : ''}>${x}</option>`).join('')}
-        </select>
-      </div>
-    </article>`).join('');
-}
-
-async function saveQuestions() {
-  const sign = Number($('signSelect').value);
-  const cards = [...document.querySelectorAll('.question-card')];
-  const rows = cards.map((card) => ({
-    sign_number: sign,
-    question_slot: Number(card.dataset.slot),
-    question_text: card.querySelector('.q-text').value.trim(),
-    option_a: card.querySelector('.q-a').value.trim(),
-    option_b: card.querySelector('.q-b').value.trim(),
-    option_c: card.querySelector('.q-c').value.trim(),
-    option_d: card.querySelector('.q-d').value.trim(),
-    correct_option: card.querySelector('.q-correct').value,
-    is_active: card.querySelector('.q-active').checked,
+  const titles={dashboard:"ภาพรวมระบบ",students:"จัดการนักเรียน",questions:"จัดการข้อสอบ",results:"ผลการเล่น",settings:"ตั้งค่าระบบ"};
+  document.querySelectorAll(".nav-item[data-tab]").forEach(btn=>btn.addEventListener("click",async()=>{
+    const tab=btn.dataset.tab;
+    document.querySelectorAll(".nav-item[data-tab]").forEach(b=>b.classList.toggle("active",b===btn));
+    document.querySelectorAll(".admin-tab").forEach(s=>s.classList.remove("active"));
+    $("tab-"+tab).classList.add("active");$("pageTitle").textContent=titles[tab];sidebar?.classList.remove("open");
+    if(tab==="dashboard")await loadDashboard();
+    if(tab==="students"){studentOffset=0;students=[];await loadStudents(true)}
+    if(tab==="questions")await loadQuestions();
+    if(tab==="results"){resultOffset=0;results=[];await loadResults(true)}
   }));
-  const invalid = rows.find((r) => r.is_active && (!r.option_a || !r.option_b || !r.option_c || !r.option_d));
-  if (invalid) return msg($('questionsMessage'), `คำถามที่ ${invalid.question_slot}: ถ้าเปิดใช้งาน ต้องกรอกตัวเลือก A–D ให้ครบ`, 'error');
+  $("mobileMenuBtn")?.addEventListener("click",()=>sidebar?.classList.toggle("open"));
 
-  $('saveQuestionsBtn').disabled = true;
-  status(`กำลังบันทึกป้าย ${sign}...`);
-  try {
-    await callAdmin('questions.upsert', { rows });
-    msg($('questionsMessage'), `บันทึกป้าย ${sign} เรียบร้อย`, 'success');
-    await loadQuestions();
-  } catch (err) {
-    console.error(err); msg($('questionsMessage'), err.message || 'บันทึกไม่สำเร็จ', 'error');
-  } finally {
-    $('saveQuestionsBtn').disabled = false;
+  function renderDashboard(d){
+    $("statStudents").textContent=d.students_total??0;$("statStarted").textContent=d.started_total??0;
+    $("statSmall").textContent=d.finished_small??0;$("statBig").textContent=d.finished_big??0;
+    $("questionHealth").textContent=(d.active_questions??0)+"/129";$("signHealth").textContent=(d.active_signs??0)+"/43";
+    $("playingNow").textContent=d.playing_now??0;
   }
-}
+  async function loadDashboard(){try{const d=await arpc("hunt_admin_dashboard");if(!d?.ok)throw new Error("เซสชันหมดอายุ");renderDashboard(d)}catch(e){logoutLocal();msg(loginMsg,"เซสชันหมดอายุ กรุณาเข้าสู่ระบบใหม่")}}
+  $("refreshDashboardBtn")?.addEventListener("click",loadDashboard);
 
-async function loadResults() {
-  status('กำลังโหลดผลการเล่น...');
-  clearMsg($('resultsMessage'));
-  try {
-    const data = await callAdmin('results.list');
-    results = data.rows || [];
-    renderResults();
-    status(`มีผู้เริ่มเกม ${results.length.toLocaleString('th-TH')} คน`);
-  } catch (err) {
-    console.error(err); msg($('resultsMessage'), 'โหลดผลการเล่นไม่สำเร็จ', 'error'); status('เกิดข้อผิดพลาด');
+  async function loadStudents(reset=false){
+    if(reset){studentOffset=0;students=[]}
+    const search=$("studentSearch").value.trim();
+    const d=await arpc("hunt_admin_list_students",{p_search:search,p_limit:200,p_offset:studentOffset});
+    if(!d?.ok)throw new Error(d?.message||"โหลดรายชื่อไม่สำเร็จ");
+    students=reset?d.items:[...students,...d.items];studentOffset=students.length;renderStudents(d.total);
   }
-}
-
-function renderResults() {
-  const active = results.filter((r) => r.status === 'active').length;
-  const ended = results.filter((r) => r.status === 'ended').length;
-  const completed = results.filter((r) => r.status === 'completed').length;
-  const avg = results.length ? (results.reduce((s, r) => s + Number(r.correct_count || 0), 0) / results.length).toFixed(1) : '0.0';
-  $('statsGrid').innerHTML = `
-    <div class="stat-card"><b>${results.length}</b><span>เริ่มเกมทั้งหมด</span></div>
-    <div class="stat-card"><b>${active}</b><span>กำลังเล่น</span></div>
-    <div class="stat-card"><b>${completed}</b><span>ครบ 25 ข้อ</span></div>
-    <div class="stat-card"><b>${avg}</b><span>คะแนนเฉลี่ย</span></div>`;
-
-  $('resultsBody').innerHTML = results.map((r) => {
-    const st = r.students || {};
-    const name = [st.prefix, st.first_name, st.last_name].filter(Boolean).join(' ');
-    const statusText = r.status === 'completed' ? 'รางวัลใหญ่' : r.status === 'ended' ? 'จบเกม' : 'กำลังเล่น';
-    const started = r.started_at ? new Date(r.started_at).toLocaleString('th-TH') : '-';
-    return `<tr>
-      <td><b>${escapeHtml(st.student_code || '')}</b></td>
-      <td>${escapeHtml(name)}</td>
-      <td>${escapeHtml(st.class_name || '-')}</td>
-      <td><b>${Number(r.correct_count || 0)}/25</b></td>
-      <td>${Number(r.wrong_count || 0)}</td>
-      <td>${Number(r.chests_opened || 0)}</td>
-      <td><span class="status-pill ${escapeHtml(r.status)}">${statusText}</span></td>
-      <td>${escapeHtml(started)}</td>
-      <td><button class="btn danger reset-btn" data-code="${escapeAttr(st.student_code || '')}" data-name="${escapeAttr(name)}">รีเซ็ต</button></td>
-    </tr>`;
-  }).join('') || '<tr><td colspan="9" class="muted">ยังไม่มีผู้เล่น</td></tr>';
-
-  document.querySelectorAll('.reset-btn').forEach((btn) => btn.addEventListener('click', () => resetSession(btn.dataset.code, btn.dataset.name)));
-}
-
-async function resetSession(code, name) {
-  if (!confirm(`รีเซ็ตเกมของ ${name || code} ?\nประวัติการเล่นจะถูกลบ และนักเรียนจะเริ่มใหม่ได้`)) return;
-  try {
-    status(`กำลังรีเซ็ต ${code}...`);
-    await callAdmin('session.reset', { student_code: code });
-    msg($('resultsMessage'), `รีเซ็ต ${name || code} เรียบร้อย`, 'success');
-    await loadResults();
-  } catch (err) {
-    console.error(err); msg($('resultsMessage'), err.message || 'รีเซ็ตไม่สำเร็จ', 'error');
+  function renderStudents(total){
+    const tb=$("studentsTableBody");
+    if(!students.length){tb.innerHTML='<tr><td colspan="5" class="empty-cell">ไม่พบรายชื่อนักเรียน</td></tr>'}
+    else tb.innerHTML=students.map(s=>`<tr>
+      <td><strong>${safe(s.student_code)}</strong></td><td>${safe(s.full_name)}</td><td>${safe(s.class_name||"-")}</td>
+      <td>${s.active?'<span class="badge green">ใช้งาน</span>':'<span class="badge red">ปิดใช้งาน</span>'}</td>
+      <td>${s.game_status?statusBadge(s.game_status):'<span class="badge">ยังไม่เล่น</span>'}</td></tr>`).join("");
+    $("studentCountLabel").textContent=`แสดง ${students.length} จาก ${total} รายการ`;
+    show($("loadMoreStudentsBtn"),students.length<total);
   }
-}
+  let studentSearchTimer;
+  $("studentSearch")?.addEventListener("input",()=>{clearTimeout(studentSearchTimer);studentSearchTimer=setTimeout(()=>loadStudents(true).catch(e=>toast(e.message,"error")),300)});
+  $("refreshStudentsBtn")?.addEventListener("click",()=>loadStudents(true).catch(e=>toast(e.message,"error")));
+  $("loadMoreStudentsBtn")?.addEventListener("click",()=>loadStudents(false).catch(e=>toast(e.message,"error")));
 
-$('adminLoginBtn').addEventListener('click', () => login($('adminPassword').value));
-$('adminPassword').addEventListener('keydown', (e) => { if (e.key === 'Enter') login($('adminPassword').value); });
-$('logoutBtn').addEventListener('click', logout);
-document.querySelectorAll('.tab-btn').forEach((b) => b.addEventListener('click', () => switchTab(b.dataset.tab)));
-$('refreshStudentsBtn').addEventListener('click', loadStudents);
-$('studentSearch').addEventListener('input', renderStudents);
-$('importStudentsBtn').addEventListener('click', importStudents);
-$('refreshQuestionsBtn').addEventListener('click', loadQuestions);
-$('signSelect').addEventListener('change', renderQuestionEditor);
-$('saveQuestionsBtn').addEventListener('click', saveQuestions);
-$('refreshResultsBtn').addEventListener('click', loadResults);
+  function parseCSV(text){
+    const rows=[];let row=[],field="",quote=false;
+    for(let i=0;i<text.length;i++){
+      const c=text[i],n=text[i+1];
+      if(c==='"'&&quote&&n==='"'){field+='"';i++;continue}
+      if(c==='"'){quote=!quote;continue}
+      if(c===","&&!quote){row.push(field);field="";continue}
+      if((c==="\n"||c==="\r")&&!quote){
+        if(c==="\r"&&n==="\n")i++;row.push(field);field="";
+        if(row.some(x=>x.trim()!==""))rows.push(row);row=[];continue
+      }
+      field+=c;
+    }
+    row.push(field);if(row.some(x=>x.trim()!==""))rows.push(row);
+    if(!rows.length)return [];
+    const headers=rows.shift().map(h=>h.replace(/^\uFEFF/,"").trim().toLowerCase());
+    const idx=(...names)=>headers.findIndex(h=>names.includes(h));
+    const ci=idx("student_code","รหัสนักเรียน","รหัส"),ni=idx("full_name","ชื่อ-สกุล","ชื่อสกุล","ชื่อ"),cl=idx("class_name","ห้อง","ชั้น");
+    if(ci<0||ni<0)throw new Error("CSV ต้องมีคอลัมน์ student_code และ full_name");
+    return rows.map(r=>({student_code:(r[ci]||"").trim(),full_name:(r[ni]||"").trim(),class_name:cl>=0?(r[cl]||"").trim():""})).filter(r=>r.student_code&&r.full_name);
+  }
+  function previewCSV(){
+    $("csvRowCount").textContent=csvRows.length;$("csvPreviewBody").innerHTML=csvRows.slice(0,8).map(r=>`<tr><td>${safe(r.student_code)}</td><td>${safe(r.full_name)}</td><td>${safe(r.class_name)}</td></tr>`).join("");
+    show($("csvPreviewWrap"),true);
+  }
+  async function handleFile(file){
+    if(!file)return;
+    try{csvRows=parseCSV(await file.text());if(!csvRows.length)throw new Error("ไม่พบรายชื่อในไฟล์");$("csvFileName").textContent=file.name;previewCSV()}
+    catch(e){toast(e.message,"error")}
+  }
+  $("openImportBtn")?.addEventListener("click",()=>show($("importModal"),true));
+  $("chooseCsvBtn")?.addEventListener("click",()=>$("csvFileInput").click());
+  $("csvFileInput")?.addEventListener("change",e=>handleFile(e.target.files[0]));
+  const dz=$("csvDropZone");
+  ["dragenter","dragover"].forEach(ev=>dz?.addEventListener(ev,e=>{e.preventDefault();dz.classList.add("dragover")}));
+  ["dragleave","drop"].forEach(ev=>dz?.addEventListener(ev,e=>{e.preventDefault();dz.classList.remove("dragover")}));
+  dz?.addEventListener("drop",e=>handleFile(e.dataTransfer.files[0]));
+  $("confirmImportBtn")?.addEventListener("click",async()=>{
+    if(!csvRows.length)return;loading(true);
+    try{
+      let done=0;
+      for(let i=0;i<csvRows.length;i+=300){
+        const batch=csvRows.slice(i,i+300);
+        const d=await arpc("hunt_admin_upsert_students",{p_rows:batch});
+        if(!d?.ok)throw new Error(d?.message||"นำเข้าไม่สำเร็จ");done+=batch.length;
+      }
+      toast(`นำเข้าสำเร็จ ${done} รายชื่อ`);show($("importModal"),false);csvRows=[];await loadStudents(true);await loadDashboard();
+    }catch(e){toast(e.message,"error")}finally{loading(false)}
+  });
 
-populateSignSelect();
-if (adminPassword) login(adminPassword);
+  async function loadQuestions(){
+    const d=await arpc("hunt_admin_list_questions");if(!d?.ok)throw new Error(d?.message||"โหลดข้อสอบไม่สำเร็จ");
+    questions=d.items||[];buildSignFilter();renderQuestions();
+  }
+  function buildSignFilter(){
+    const sel=$("signFilter"),current=sel.value;sel.innerHTML='<option value="">ทุกป้าย</option>';
+    [...new Set(questions.map(q=>q.sign_number))].sort((a,b)=>a-b).forEach(n=>{const o=document.createElement("option");o.value=n;o.textContent="ป้าย "+n;sel.appendChild(o)});sel.value=current;
+  }
+  function renderQuestions(){
+    const term=$("questionSearch").value.trim().toLowerCase(),sf=$("signFilter").value;
+    const list=questions.filter(q=>(!sf||String(q.sign_number)===sf)&&(!term||[q.sign_number,q.sign_title,q.question_text].join(" ").toLowerCase().includes(term)));
+    const tb=$("questionsTableBody");
+    if(!list.length){tb.innerHTML='<tr><td colspan="6" class="empty-cell">ไม่พบข้อสอบ</td></tr>';return}
+    tb.innerHTML=list.map(q=>`<tr>
+      <td><strong>${q.sign_number}</strong></td><td>${q.question_no}</td>
+      <td><span class="question-title">${safe(q.sign_title)}</span><span class="question-preview">${safe(q.question_text)}</span></td>
+      <td><span class="badge gold">${({A:"ก",B:"ข",C:"ค",D:"ง"})[q.correct_option]||q.correct_option}</span></td>
+      <td>${q.active?'<span class="badge green">ใช้งาน</span>':'<span class="badge red">ปิด</span>'}</td>
+      <td><button class="row-btn edit-question" data-id="${q.id}">แก้ไข</button></td></tr>`).join("");
+  }
+  $("questionSearch")?.addEventListener("input",renderQuestions);$("signFilter")?.addEventListener("change",renderQuestions);
+  $("refreshQuestionsBtn")?.addEventListener("click",()=>loadQuestions().catch(e=>toast(e.message,"error")));
+  $("questionsTableBody")?.addEventListener("click",e=>{
+    const b=e.target.closest(".edit-question");if(!b)return;const q=questions.find(x=>String(x.id)===b.dataset.id);if(!q)return;
+    $("qId").value=q.id;$("qSignTitle").value=q.sign_title;$("qText").value=q.question_text;$("qA").value=q.option_a;$("qB").value=q.option_b;$("qC").value=q.option_c;$("qD").value=q.option_d;$("qCorrect").value=q.correct_option;$("qActive").checked=!!q.active;
+    $("questionModalTitle").textContent=`ป้าย ${q.sign_number} · ข้อ ${q.question_no}`;show($("questionModal"),true);
+  });
+  $("questionForm")?.addEventListener("submit",async e=>{
+    e.preventDefault();loading(true);
+    try{
+      const d=await arpc("hunt_admin_save_question",{p_question_id:Number($("qId").value),p_sign_title:$("qSignTitle").value.trim(),p_question_text:$("qText").value.trim(),p_option_a:$("qA").value.trim(),p_option_b:$("qB").value.trim(),p_option_c:$("qC").value.trim(),p_option_d:$("qD").value.trim(),p_correct_option:$("qCorrect").value,p_active:$("qActive").checked});
+      if(!d?.ok)throw new Error(d?.message||"บันทึกไม่สำเร็จ");toast("บันทึกข้อสอบแล้ว");show($("questionModal"),false);await loadQuestions();await loadDashboard();
+    }catch(err){toast(err.message,"error")}finally{loading(false)}
+  });
+
+  async function loadResults(reset=false){
+    if(reset){resultOffset=0;results=[]}
+    const d=await arpc("hunt_admin_list_results",{p_search:$("resultSearch").value.trim(),p_status:$("resultStatusFilter").value,p_limit:200,p_offset:resultOffset});
+    if(!d?.ok)throw new Error(d?.message||"โหลดผลไม่สำเร็จ");
+    results=reset?d.items:[...results,...d.items];resultOffset=results.length;renderResults(d.total);
+  }
+  function renderResults(total){
+    const tb=$("resultsTableBody");
+    if(!results.length){tb.innerHTML='<tr><td colspan="7" class="empty-cell">ยังไม่มีผลการเล่น</td></tr>'}
+    else tb.innerHTML=results.map(r=>`<tr>
+      <td><strong>${safe(r.full_name)}</strong><br><span style="color:#6f889a">${safe(r.student_code)}</span></td><td>${safe(r.class_name||"-")}</td>
+      <td><strong>${r.correct_count}/25</strong></td><td>${r.total_attempts}</td><td>${statusBadge(r.status)}</td><td>${fmtDate(r.started_at)}</td>
+      <td><button class="row-btn danger reset-player" data-code="${safe(r.student_code)}" data-name="${safe(r.full_name)}">รีเซ็ต</button></td></tr>`).join("");
+    $("resultCountLabel").textContent=`แสดง ${results.length} จาก ${total} รายการ`;show($("loadMoreResultsBtn"),results.length<total);
+  }
+  let resultTimer;
+  $("resultSearch")?.addEventListener("input",()=>{clearTimeout(resultTimer);resultTimer=setTimeout(()=>loadResults(true).catch(e=>toast(e.message,"error")),300)});
+  $("resultStatusFilter")?.addEventListener("change",()=>loadResults(true).catch(e=>toast(e.message,"error")));
+  $("refreshResultsBtn")?.addEventListener("click",()=>loadResults(true).catch(e=>toast(e.message,"error")));
+  $("loadMoreResultsBtn")?.addEventListener("click",()=>loadResults(false).catch(e=>toast(e.message,"error")));
+  $("resultsTableBody")?.addEventListener("click",e=>{
+    const b=e.target.closest(".reset-player");if(!b)return;
+    openConfirm("รีเซ็ตผู้เล่น",`ต้องการรีเซ็ต ${b.dataset.name} (${b.dataset.code}) ใช่หรือไม่? ประวัติการเล่นรอบนี้จะถูกลบและนักเรียนจะเล่นใหม่ได้`,async()=>{
+      loading(true);try{const d=await arpc("hunt_admin_reset_student",{p_student_code:b.dataset.code});if(!d?.ok)throw new Error(d?.message||"รีเซ็ตไม่สำเร็จ");toast("รีเซ็ตผู้เล่นแล้ว");await loadResults(true);await loadDashboard()}catch(err){toast(err.message,"error")}finally{loading(false)}
+    });
+  });
+  $("exportResultsBtn")?.addEventListener("click",()=>{
+    const h=["student_code","full_name","class_name","correct_count","total_attempts","status","started_at","finished_at"];
+    const lines=[h.join(","),...results.map(r=>h.map(k=>escCSV(r[k])).join(","))];
+    const blob=new Blob(["\uFEFF"+lines.join("\n")],{type:"text/csv;charset=utf-8"}),a=document.createElement("a");
+    a.href=URL.createObjectURL(blob);a.download="treasure-hunt-results.csv";a.click();URL.revokeObjectURL(a.href);
+  });
+
+  $("changePasswordForm")?.addEventListener("submit",async e=>{
+    e.preventDefault();show($("settingsMessage"),false);
+    const cur=$("currentPassword").value,nw=$("newPassword").value,cf=$("confirmPassword").value;
+    if(nw!==cf){msg($("settingsMessage"),"รหัสผ่านใหม่ไม่ตรงกัน");return}
+    loading(true);try{
+      const d=await arpc("hunt_admin_change_password",{p_current_password:cur,p_new_password:nw});
+      if(!d?.ok)throw new Error(d?.message||"เปลี่ยนรหัสผ่านไม่สำเร็จ");
+      msg($("settingsMessage"),"เปลี่ยนรหัสผ่านเรียบร้อย",true);e.target.reset();
+    }catch(err){msg($("settingsMessage"),err.message)}finally{loading(false)}
+  });
+
+  function openConfirm(title,text,fn){$("confirmTitle").textContent=title;$("confirmText").textContent=text;confirmAction=fn;show($("confirmModal"),true)}
+  $("confirmCancelBtn")?.addEventListener("click",()=>{confirmAction=null;show($("confirmModal"),false)});
+  $("confirmOkBtn")?.addEventListener("click",async()=>{const fn=confirmAction;confirmAction=null;show($("confirmModal"),false);if(fn)await fn()});
+  document.querySelectorAll("[data-close]").forEach(b=>b.addEventListener("click",()=>show($(b.dataset.close),false)));
+
+  function logoutLocal(){adminToken="";sessionStorage.removeItem("treasure_admin_token");show(app,false);show(loginView,true)}
+  $("logoutBtn")?.addEventListener("click",async()=>{try{if(adminToken)await arpc("hunt_admin_logout")}catch{}logoutLocal()});
+
+  if(window.TREASURE_CONFIG_ERROR){msg(loginMsg,"ยังไม่ได้ตั้งค่า Supabase ในไฟล์ config.js")}
+  else validateSession().then(ok=>{if(ok){show(loginView,false);show(app,true)}else logoutLocal()});
+})();

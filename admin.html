@@ -1,118 +1,235 @@
 <!doctype html>
 <html lang="th">
 <head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <meta name="theme-color" content="#102a43" />
-  <title>Admin • ตามล่าหาสมบัติ</title>
-  <link rel="stylesheet" href="./style.css" />
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="theme-color" content="#061322">
+  <title>Admin · Science Treasure Hunt</title>
+  <link rel="stylesheet" href="./style.css">
 </head>
-<body>
-  <main class="admin-shell">
-    <section id="adminLogin" class="panel login-panel">
-      <p class="eyebrow">ADMIN</p>
-      <h1>ระบบหลังบ้าน</h1>
-      <p class="muted">กรอกรหัสผ่านผู้ดูแลระบบ</p>
-      <div class="form-field" style="margin-top:16px">
-        <label for="adminPassword">รหัสผ่าน</label>
-        <input id="adminPassword" class="input" type="password" autocomplete="current-password" placeholder="รหัสผ่าน Admin">
-      </div>
-      <button id="adminLoginBtn" class="btn primary large full" style="margin-top:12px">เข้าสู่ระบบ</button>
-      <div id="loginMessage" class="message hidden"></div>
-    </section>
+<body class="admin-page">
+  <div class="ambient ambient-a"></div><div class="ambient ambient-b"></div>
 
-    <section id="adminApp" class="hidden">
-      <header class="admin-top">
-        <div class="admin-title">
-          <p class="eyebrow">TREASURE HUNT ADMIN</p>
-          <h1>จัดการเกมตามล่าหาสมบัติ</h1>
-          <p>นักเรียน • ข้อสอบ 43 ป้าย • ผลการเล่น</p>
+  <section id="adminLoginView" class="admin-login-wrap">
+    <div class="admin-login-card glass-card">
+      <a class="brand centered" href="./index.html">
+        <span class="brand-mark">✦</span>
+        <span><b>SCIENCE TREASURE HUNT</b><small>ADMIN CONTROL CENTER</small></span>
+      </a>
+      <div class="admin-lock">⌘</div>
+      <div class="card-kicker">SECURE AREA</div>
+      <h1>ระบบหลังบ้าน</h1>
+      <p>จัดการรายชื่อนักเรียน ข้อสอบ และผลการเล่นทั้งหมด</p>
+      <form id="adminLoginForm" autocomplete="off">
+        <label for="adminPassword">รหัสผ่านผู้ดูแลระบบ</label>
+        <input id="adminPassword" type="password" inputmode="numeric" autocomplete="current-password" placeholder="กรอกรหัสผ่าน" required>
+        <button class="btn btn-gold btn-block" type="submit">เข้าสู่ระบบ</button>
+      </form>
+      <div id="adminLoginMessage" class="inline-alert hidden"></div>
+      <a class="back-home" href="./index.html">← กลับหน้าผู้เล่น</a>
+    </div>
+  </section>
+
+  <div id="adminApp" class="admin-app hidden">
+    <aside class="admin-sidebar">
+      <a class="brand sidebar-brand" href="./index.html">
+        <span class="brand-mark">✦</span>
+        <span><b>TREASURE HUNT</b><small>ADMIN</small></span>
+      </a>
+      <nav class="admin-nav">
+        <button class="nav-item active" data-tab="dashboard"><span>◈</span> ภาพรวม</button>
+        <button class="nav-item" data-tab="students"><span>◎</span> นักเรียน</button>
+        <button class="nav-item" data-tab="questions"><span>?</span> ข้อสอบ</button>
+        <button class="nav-item" data-tab="results"><span>▥</span> ผลการเล่น</button>
+        <button class="nav-item" data-tab="settings"><span>⚙</span> ตั้งค่า</button>
+      </nav>
+      <div class="sidebar-bottom">
+        <a class="nav-item link-item" href="./index.html"><span>↗</span> เปิดหน้าผู้เล่น</a>
+        <button id="logoutBtn" class="nav-item danger-item"><span>↪</span> ออกจากระบบ</button>
+      </div>
+    </aside>
+
+    <main class="admin-main">
+      <header class="admin-topbar">
+        <div>
+          <button id="mobileMenuBtn" class="mobile-menu">☰</button>
+          <div>
+            <small>SCIENCE WEEK 2026</small>
+            <h1 id="pageTitle">ภาพรวมระบบ</h1>
+          </div>
         </div>
-        <div class="inline-row">
-          <a class="btn secondary" href="./index.html">หน้าเกม</a>
-          <button id="logoutBtn" class="btn danger">ออกจากระบบ</button>
-        </div>
+        <div class="admin-badge"><span class="live-dot"></span> ADMIN ONLINE</div>
       </header>
 
-      <div class="toolbar">
-        <div class="tabs">
-          <button class="tab-btn active" data-tab="students">นักเรียน</button>
-          <button class="tab-btn" data-tab="questions">ข้อสอบ</button>
-          <button class="tab-btn" data-tab="results">ผลการเล่น</button>
+      <section id="tab-dashboard" class="admin-tab active">
+        <div class="stats-cards">
+          <article class="stat-card"><small>นักเรียนทั้งหมด</small><strong id="statStudents">0</strong><span>รายชื่อในระบบ</span></article>
+          <article class="stat-card"><small>เริ่มภารกิจแล้ว</small><strong id="statStarted">0</strong><span>คน</span></article>
+          <article class="stat-card"><small>จบรับรางวัล</small><strong id="statSmall">0</strong><span>10–24 ข้อ</span></article>
+          <article class="stat-card accent"><small>รางวัลใหญ่</small><strong id="statBig">0</strong><span>ครบ 25 ข้อ</span></article>
         </div>
-        <div id="adminStatus" class="muted small">พร้อมใช้งาน</div>
+        <div class="admin-grid-2">
+          <article class="admin-panel">
+            <div class="panel-head"><div><small>GAME STATUS</small><h2>สถานะระบบเกม</h2></div><button id="refreshDashboardBtn" class="icon-btn">↻</button></div>
+            <div class="system-health">
+              <div><span class="health-dot ok"></span><b>คลังข้อสอบ</b><strong id="questionHealth">0/129</strong></div>
+              <div><span class="health-dot ok"></span><b>ป้ายพร้อมใช้งาน</b><strong id="signHealth">0/43</strong></div>
+              <div><span class="health-dot ok"></span><b>ผู้เล่นกำลังเล่น</b><strong id="playingNow">0</strong></div>
+            </div>
+          </article>
+          <article class="admin-panel">
+            <div class="panel-head"><div><small>QUICK START</small><h2>เตรียมระบบก่อนเปิดเกม</h2></div></div>
+            <ol class="checklist">
+              <li><span>1</span><div><b>นำเข้ารายชื่อนักเรียน</b><small>ใช้ไฟล์ CSV Template</small></div></li>
+              <li><span>2</span><div><b>ตรวจข้อสอบ 43 ป้าย</b><small>ระบบเตรียมไว้ 3 ข้อต่อป้าย</small></div></li>
+              <li><span>3</span><div><b>ทดสอบด้วยรหัสตัวอย่าง</b><small>รีเซ็ตได้จากเมนูผลการเล่น</small></div></li>
+            </ol>
+          </article>
+        </div>
+      </section>
+
+      <section id="tab-students" class="admin-tab">
+        <div class="section-toolbar">
+          <div><p>จัดการรายชื่อนักเรียน</p><small>ค้นหา นำเข้า และแก้ไขสถานะรายชื่อ</small></div>
+          <div class="toolbar-actions">
+            <a class="btn btn-outline" href="./students-template.csv" download>ดาวน์โหลด Template</a>
+            <button id="openImportBtn" class="btn btn-primary">+ นำเข้า CSV</button>
+          </div>
+        </div>
+        <article class="admin-panel">
+          <div class="table-toolbar">
+            <input id="studentSearch" class="search-input" placeholder="ค้นหารหัส ชื่อ หรือห้อง...">
+            <button id="refreshStudentsBtn" class="icon-btn">↻</button>
+          </div>
+          <div class="table-wrap">
+            <table class="data-table">
+              <thead><tr><th>รหัสนักเรียน</th><th>ชื่อ-สกุล</th><th>ห้อง</th><th>สถานะ</th><th>การเล่น</th></tr></thead>
+              <tbody id="studentsTableBody"><tr><td colspan="5" class="empty-cell">กำลังโหลด...</td></tr></tbody>
+            </table>
+          </div>
+          <div class="table-footer"><span id="studentCountLabel">0 รายการ</span><button id="loadMoreStudentsBtn" class="btn btn-outline btn-small">โหลดเพิ่ม</button></div>
+        </article>
+      </section>
+
+      <section id="tab-questions" class="admin-tab">
+        <div class="section-toolbar">
+          <div><p>คลังข้อสอบ 43 ป้าย</p><small>นักเรียนจะไม่เห็นข้อความคำถามในหน้าเกม เห็นเฉพาะหมายเลขป้ายและตัวเลือก</small></div>
+          <div class="toolbar-actions"><button id="refreshQuestionsBtn" class="icon-btn">↻</button></div>
+        </div>
+        <article class="admin-panel">
+          <div class="table-toolbar">
+            <input id="questionSearch" class="search-input" placeholder="ค้นหาป้าย หัวข้อ หรือคำถาม...">
+            <select id="signFilter"><option value="">ทุกป้าย</option></select>
+          </div>
+          <div class="table-wrap">
+            <table class="data-table question-table">
+              <thead><tr><th>ป้าย</th><th>ข้อ</th><th>หัวข้อ / คำถาม</th><th>เฉลย</th><th>สถานะ</th><th></th></tr></thead>
+              <tbody id="questionsTableBody"><tr><td colspan="6" class="empty-cell">กำลังโหลด...</td></tr></tbody>
+            </table>
+          </div>
+        </article>
+      </section>
+
+      <section id="tab-results" class="admin-tab">
+        <div class="section-toolbar">
+          <div><p>ผลการเล่น</p><small>ติดตามความคืบหน้าและรีเซ็ตเฉพาะกรณีที่ครูอนุญาต</small></div>
+          <div class="toolbar-actions"><button id="exportResultsBtn" class="btn btn-outline">ส่งออก CSV</button><button id="refreshResultsBtn" class="icon-btn">↻</button></div>
+        </div>
+        <article class="admin-panel">
+          <div class="table-toolbar">
+            <input id="resultSearch" class="search-input" placeholder="ค้นหารหัส ชื่อ หรือห้อง...">
+            <select id="resultStatusFilter">
+              <option value="">ทุกสถานะ</option>
+              <option value="playing">กำลังเล่น</option>
+              <option value="milestone">ครบ 10 ข้อ</option>
+              <option value="finished_small">จบรับรางวัล</option>
+              <option value="finished_big">รางวัลใหญ่</option>
+            </select>
+          </div>
+          <div class="table-wrap">
+            <table class="data-table">
+              <thead><tr><th>นักเรียน</th><th>ห้อง</th><th>ตอบถูก</th><th>ครั้งที่ตอบ</th><th>สถานะ</th><th>เริ่มเล่น</th><th></th></tr></thead>
+              <tbody id="resultsTableBody"><tr><td colspan="7" class="empty-cell">กำลังโหลด...</td></tr></tbody>
+            </table>
+          </div>
+          <div class="table-footer"><span id="resultCountLabel">0 รายการ</span><button id="loadMoreResultsBtn" class="btn btn-outline btn-small">โหลดเพิ่ม</button></div>
+        </article>
+      </section>
+
+      <section id="tab-settings" class="admin-tab">
+        <div class="admin-grid-2">
+          <article class="admin-panel">
+            <div class="panel-head"><div><small>SECURITY</small><h2>เปลี่ยนรหัสผ่าน Admin</h2></div></div>
+            <form id="changePasswordForm" class="settings-form">
+              <label>รหัสผ่านปัจจุบัน<input id="currentPassword" type="password" required></label>
+              <label>รหัสผ่านใหม่<input id="newPassword" type="password" minlength="8" required></label>
+              <label>ยืนยันรหัสผ่านใหม่<input id="confirmPassword" type="password" minlength="8" required></label>
+              <button class="btn btn-primary" type="submit">บันทึกรหัสผ่านใหม่</button>
+            </form>
+            <div id="settingsMessage" class="inline-alert hidden"></div>
+          </article>
+          <article class="admin-panel warning-panel">
+            <div class="panel-head"><div><small>IMPORTANT</small><h2>การป้องกันเล่นซ้ำ</h2></div></div>
+            <p>ระบบล็อกการเล่นด้วยรหัสนักเรียนที่ระดับฐานข้อมูล เมื่อเริ่มเกมแล้วจะเริ่มรอบใหม่ไม่ได้ แม้เปลี่ยนเครื่องหรือเปิดเบราว์เซอร์ใหม่</p>
+            <p>การกด “รีเซ็ต” ในหน้าผลการเล่นจะลบประวัติรอบนั้นและเปิดสิทธิ์ให้เล่นใหม่ ใช้เฉพาะเมื่อจำเป็นเท่านั้น</p>
+          </article>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <div id="importModal" class="modal-backdrop hidden">
+    <div class="admin-modal wide">
+      <div class="modal-head"><div><small>IMPORT STUDENTS</small><h2>นำเข้ารายชื่อนักเรียน</h2></div><button class="modal-close" data-close="importModal">×</button></div>
+      <div class="drop-zone" id="csvDropZone">
+        <input id="csvFileInput" type="file" accept=".csv,text/csv" hidden>
+        <div class="drop-icon">⇧</div>
+        <b>เลือกไฟล์ CSV หรือวางไฟล์ที่นี่</b>
+        <span>คอลัมน์: student_code, full_name, class_name</span>
+        <button id="chooseCsvBtn" class="btn btn-outline">เลือกไฟล์</button>
       </div>
+      <div id="csvPreviewWrap" class="hidden">
+        <div class="preview-summary"><span>พบ <b id="csvRowCount">0</b> รายชื่อ</span><span id="csvFileName"></span></div>
+        <div class="table-wrap mini"><table class="data-table"><thead><tr><th>รหัส</th><th>ชื่อ-สกุล</th><th>ห้อง</th></tr></thead><tbody id="csvPreviewBody"></tbody></table></div>
+        <div class="modal-actions"><button class="btn btn-outline" data-close="importModal">ยกเลิก</button><button id="confirmImportBtn" class="btn btn-primary">นำเข้ารายชื่อ</button></div>
+      </div>
+    </div>
+  </div>
 
-      <section id="tab-students" class="panel admin-panel tab-panel">
-        <div class="admin-section-title">
-          <div>
-            <h2>รายชื่อนักเรียน</h2>
-            <div class="muted small">นำเข้าไฟล์ CSV ได้ครั้งละหลายร้อยคน ระบบจะอัปเดตรหัสที่ซ้ำให้</div>
-          </div>
-          <button id="refreshStudentsBtn" class="btn secondary">รีเฟรช</button>
+  <div id="questionModal" class="modal-backdrop hidden">
+    <div class="admin-modal wide">
+      <div class="modal-head"><div><small>EDIT QUESTION</small><h2 id="questionModalTitle">แก้ไขข้อสอบ</h2></div><button class="modal-close" data-close="questionModal">×</button></div>
+      <form id="questionForm" class="question-form">
+        <input id="qId" type="hidden">
+        <div class="form-grid two"><label>หัวข้อป้าย<input id="qSignTitle" required></label><label>เฉลย<select id="qCorrect"><option value="A">ก</option><option value="B">ข</option><option value="C">ค</option><option value="D">ง</option></select></label></div>
+        <label>คำถาม<textarea id="qText" rows="3" required></textarea></label>
+        <div class="form-grid two">
+          <label>ก.<textarea id="qA" rows="2" required></textarea></label>
+          <label>ข.<textarea id="qB" rows="2" required></textarea></label>
+          <label>ค.<textarea id="qC" rows="2" required></textarea></label>
+          <label>ง.<textarea id="qD" rows="2" required></textarea></label>
         </div>
-        <div class="grid-2" style="margin-bottom:14px">
-          <div class="form-field">
-            <label>ไฟล์รายชื่อนักเรียน (.csv)</label>
-            <input id="studentCsv" class="file-input" type="file" accept=".csv,text/csv">
-          </div>
-          <div class="form-field">
-            <label>Template ตัวอย่าง</label>
-            <a class="btn secondary" href="./students-template.csv" download>ดาวน์โหลด students-template.csv</a>
-          </div>
-        </div>
-        <div class="inline-row" style="margin-bottom:14px">
-          <button id="importStudentsBtn" class="btn primary">นำเข้ารายชื่อ</button>
-          <input id="studentSearch" class="input" style="max-width:320px" placeholder="ค้นหารหัส / ชื่อ / ห้อง">
-        </div>
-        <div id="studentsMessage" class="message hidden"></div>
-        <div class="table-wrap">
-          <table>
-            <thead><tr><th>รหัส</th><th>ชื่อ-สกุล</th><th>ห้อง</th><th>สถานะ</th></tr></thead>
-            <tbody id="studentsBody"></tbody>
-          </table>
-        </div>
-      </section>
+        <label class="switch-label"><input id="qActive" type="checkbox"><span class="switch"></span> เปิดใช้งานข้อนี้</label>
+        <div class="modal-actions"><button type="button" class="btn btn-outline" data-close="questionModal">ยกเลิก</button><button type="submit" class="btn btn-primary">บันทึกข้อสอบ</button></div>
+      </form>
+    </div>
+  </div>
 
-      <section id="tab-questions" class="panel admin-panel tab-panel hidden">
-        <div class="admin-section-title">
-          <div>
-            <h2>แก้ไขข้อสอบและคำตอบ</h2>
-            <div class="muted small">แต่ละป้ายมี 3 ข้อ ระบบจะสุ่ม 1 ข้อเมื่อผู้เล่นได้ป้ายนั้น</div>
-          </div>
-          <button id="refreshQuestionsBtn" class="btn secondary">รีเฟรช</button>
-        </div>
-        <div class="notice" style="margin-bottom:14px">หน้าเกมนักเรียนจะแสดงเฉพาะหมายเลขป้ายและตัวเลือก A–D เท่านั้น ข้อความคำถามด้านล่างใช้สำหรับครูตรวจสอบในระบบหลังบ้าน</div>
-        <div class="inline-row" style="margin-bottom:14px">
-          <label for="signSelect" class="muted">เลือกป้าย</label>
-          <select id="signSelect" class="select" style="max-width:180px"></select>
-          <button id="saveQuestionsBtn" class="btn primary">บันทึกป้ายนี้</button>
-        </div>
-        <div id="questionsMessage" class="message hidden"></div>
-        <div id="questionEditor" class="question-editor"></div>
-      </section>
+  <div id="confirmModal" class="modal-backdrop hidden">
+    <div class="admin-modal confirm">
+      <div class="status-icon danger">!</div>
+      <h2 id="confirmTitle">ยืนยันการทำรายการ</h2>
+      <p id="confirmText"></p>
+      <div class="modal-actions"><button id="confirmCancelBtn" class="btn btn-outline">ยกเลิก</button><button id="confirmOkBtn" class="btn btn-danger">ยืนยัน</button></div>
+    </div>
+  </div>
 
-      <section id="tab-results" class="panel admin-panel tab-panel hidden">
-        <div class="admin-section-title">
-          <div>
-            <h2>ผลการเล่น</h2>
-            <div class="muted small">ดูคะแนน หีบที่เปิด และสถานะของผู้เล่น</div>
-          </div>
-          <button id="refreshResultsBtn" class="btn secondary">รีเฟรช</button>
-        </div>
-        <div id="statsGrid" class="stats-grid"></div>
-        <div class="notice" style="margin-bottom:14px">ปุ่ม “รีเซ็ต” จะลบประวัติเกมของนักเรียนคนนั้นทั้งหมด และทำให้สามารถเริ่มเล่นใหม่ได้ ใช้เฉพาะเมื่อครูต้องการแก้ปัญหาเท่านั้น</div>
-        <div id="resultsMessage" class="message hidden"></div>
-        <div class="table-wrap">
-          <table>
-            <thead><tr><th>รหัส</th><th>ชื่อ-สกุล</th><th>ห้อง</th><th>คะแนน</th><th>ตอบผิด</th><th>หีบ</th><th>สถานะ</th><th>เริ่ม</th><th>จัดการ</th></tr></thead>
-            <tbody id="resultsBody"></tbody>
-          </table>
-        </div>
-      </section>
-    </section>
-  </main>
+  <div id="adminToast" class="toast hidden"></div>
+  <div id="adminLoading" class="loading-overlay hidden"><div class="loader"></div><span>กำลังประมวลผล...</span></div>
 
-  <script type="module" src="./admin.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="./config.js"></script>
+  <script src="./supabase-client.js"></script>
+  <script src="./admin.js"></script>
 </body>
 </html>

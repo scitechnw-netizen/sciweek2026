@@ -1,99 +1,164 @@
 <!doctype html>
 <html lang="th">
 <head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
-  <meta name="theme-color" content="#102a43" />
-  <title>ตามล่าหาสมบัติ</title>
-  <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
-  <link rel="stylesheet" href="./style.css" />
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="theme-color" content="#061322">
+  <title>ตามล่าหาสมบัติวิทยาศาสตร์</title>
+  <meta name="description" content="เกมตามล่าหาสมบัติ สัปดาห์วิทยาศาสตร์">
+  <link rel="stylesheet" href="./style.css">
 </head>
-<body>
-  <div class="ambient ambient-a"></div>
-  <div class="ambient ambient-b"></div>
+<body class="player-page">
+  <div class="ambient ambient-a"></div><div class="ambient ambient-b"></div>
+  <header class="site-header">
+    <a class="brand" href="./index.html" aria-label="หน้าแรก">
+      <span class="brand-mark">✦</span>
+      <span><b>SCIENCE TREASURE HUNT</b><small>ภารกิจตามล่าหาสมบัติ</small></span>
+    </a>
+    <div class="header-actions">
+      <span class="event-chip">SCIENCE WEEK 2026</span>
+      <a class="ghost-link" href="./admin.html">ผู้ดูแลระบบ</a>
+    </div>
+  </header>
 
-  <main class="app-shell">
-    <header class="hero compact">
-      <div class="brand-mark">🗺️</div>
-      <div>
-        <p class="eyebrow">TREASURE HUNT</p>
-        <h1>ตามล่าหาสมบัติ</h1>
-        <p class="hero-copy">ตามหาป้าย • ตอบคำถาม • เปิดหีบสมบัติ</p>
-      </div>
-    </header>
-
-    <section id="setupView" class="panel setup-panel">
-      <div class="step-badge">เริ่มภารกิจ</div>
-      <h2>ค้นหานักเรียน</h2>
-      <p class="muted">กรอกรหัสนักเรียนของตนเอง แล้วกด “ค้นหา”</p>
-
-      <div class="search-row">
-        <input id="studentCode" class="input" type="text" inputmode="numeric" autocomplete="off" placeholder="รหัสนักเรียน" aria-label="รหัสนักเรียน">
-        <button id="searchBtn" class="btn primary" type="button">ค้นหา</button>
-      </div>
-
-      <div id="lookupResult" class="lookup-result hidden"></div>
-      <div id="setupMessage" class="message hidden" role="status"></div>
+  <main class="player-shell">
+    <section id="configError" class="panel error-panel hidden">
+      <div class="status-icon danger">!</div>
+      <h2>ยังไม่ได้เชื่อมต่อ Supabase</h2>
+      <p>กรุณาใส่ SUPABASE_URL และ SUPABASE_ANON_KEY ในไฟล์ <b>config.js</b></p>
     </section>
 
-    <section id="gameView" class="hidden">
-      <div class="player-bar panel">
-        <div>
-          <span class="mini-label">ผู้เล่น</span>
-          <strong id="playerName">-</strong>
-          <span id="playerClass" class="muted small"></span>
-        </div>
-        <div class="score-wrap">
-          <span class="score"><b id="scoreValue">0</b>/25</span>
-          <span class="chest-counter">🧰 <b id="chestValue">0</b>/2</span>
-        </div>
-      </div>
+    <section id="landingView" class="landing-grid">
+      <div class="hero-copy">
+        <div class="eyebrow">MISSION 01 · FIND THE SIGNS</div>
+        <h1>ตามล่าหา<br><span>สมบัติวิทยาศาสตร์</span></h1>
+        <p class="hero-lead">ค้นหาป้าย ตอบคำถาม ปลดล็อกหีบสมบัติ และพิชิตรางวัลใหญ่ให้ครบ 25 ภารกิจ</p>
 
-      <div id="questionPanel" class="panel game-card hidden">
-        <div class="progress-line"><span id="progressFill"></span></div>
-        <div class="round-label">คำถามข้อที่ <span id="roundNumber">1</span> จาก 25</div>
-        <div class="sign-card">
-          <span>ไปที่</span>
-          <strong>ป้ายหมายเลข <b id="signNumber">—</b></strong>
-          <small>อ่านคำถามบนป้าย แล้วเลือกคำตอบด้านล่าง</small>
-        </div>
-        <div id="choices" class="choices" aria-live="polite"></div>
-        <div id="answerMessage" class="message hidden"></div>
-      </div>
-
-      <div id="loadingPanel" class="panel loading-card hidden">
-        <div class="spinner"></div>
-        <strong>กำลังสุ่มป้ายสมบัติ...</strong>
-      </div>
-
-      <div id="chestPanel" class="panel milestone-card hidden">
-        <div class="chest-emoji">🎁</div>
-        <p class="eyebrow">MILESTONE</p>
-        <h2>ยินดีด้วย!</h2>
-        <p>ตอบถูกครบ <b id="milestoneScore">10</b> ข้อ<br>เปิดหีบสมบัติได้ <b id="milestoneChest">1</b> หีบ</p>
-        <div class="button-stack">
-          <button id="continueBtn" class="btn primary large">🔎 หาคำตอบต่อ</button>
-          <button id="finishBtn" class="btn secondary large">🏁 จบเกมและรับรางวัล</button>
+        <div class="rules-mini">
+          <div><span>01</span><p><b>ค้นหาป้าย</b><small>ระบบสุ่มจาก 43 ป้าย</small></p></div>
+          <div><span>02</span><p><b>ตอบจากป้ายจริง</b><small>หน้าเว็บแสดงเฉพาะตัวเลือก</small></p></div>
+          <div><span>03</span><p><b>ครบ 10 ข้อ</b><small>ปลดล็อกหีบสมบัติ 1 หีบ</small></p></div>
+          <div><span>04</span><p><b>ครบ 25 ข้อ</b><small>รับรางวัลใหญ่ ห้อง 738</small></p></div>
         </div>
       </div>
 
-      <div id="finishPanel" class="panel finish-card hidden">
-        <div id="finishIcon" class="finish-icon">🏆</div>
-        <p class="eyebrow">MISSION COMPLETE</p>
-        <h2 id="finishTitle">ยินดีด้วย!</h2>
-        <p id="finishText"></p>
-        <div class="room-callout">มารับของรางวัลที่<br><strong>ห้อง 738</strong></div>
-        <p class="muted small">รหัสนักเรียนนี้จะไม่สามารถเริ่มเกมใหม่ได้</p>
-        <button id="leaveDeviceBtn" class="btn secondary">ออกจากหน้าผู้เล่นนี้</button>
+      <div class="login-card glass-card">
+        <div class="card-kicker">START MISSION</div>
+        <h2>ค้นหานักเรียน</h2>
+        <p>กรอกรหัสนักเรียนของตนเอง แล้วกด “ค้นหา”</p>
+        <form id="lookupForm" class="lookup-form" autocomplete="off">
+          <label for="studentCode">รหัสนักเรียน</label>
+          <div class="input-action">
+            <input id="studentCode" inputmode="numeric" autocomplete="off" maxlength="30" placeholder="กรอกรหัสนักเรียน" required>
+            <button class="btn btn-gold" type="submit" id="lookupBtn">ค้นหา</button>
+          </div>
+        </form>
+
+        <div id="lookupResult" class="student-result hidden">
+          <div class="avatar">ST</div>
+          <div class="student-meta">
+            <small>พบข้อมูลนักเรียน</small>
+            <strong id="studentName">-</strong>
+            <span id="studentClass">-</span>
+          </div>
+          <button id="startGameBtn" class="btn btn-primary btn-block">เริ่มภารกิจ</button>
+        </div>
+
+        <div id="lookupMessage" class="inline-alert hidden"></div>
+        <div class="security-note"><span>◆</span> 1 รหัสนักเรียนสามารถเริ่มเกมได้เพียง 1 ครั้ง</div>
       </div>
     </section>
 
-    <footer class="footer">
-      <span>ระบบตามล่าหาสมบัติ</span>
-      <a href="./admin.html">ผู้ดูแลระบบ</a>
-    </footer>
+    <section id="gameView" class="game-layout hidden">
+      <aside class="mission-sidebar glass-card">
+        <div class="profile-row">
+          <div class="avatar large">ST</div>
+          <div><small>ผู้เล่น</small><strong id="gameStudentName">-</strong><span id="gameStudentClass">-</span></div>
+        </div>
+        <div class="sidebar-divider"></div>
+        <div class="progress-label"><span>ความคืบหน้า</span><b><span id="correctCount">0</span>/25</b></div>
+        <div class="progress-track"><div id="progressBar" class="progress-fill"></div></div>
+
+        <div class="stat-grid">
+          <div><small>ภารกิจ</small><strong id="roundStat">1/25</strong></div>
+          <div><small>ลองตอบ</small><strong id="attemptStat">0</strong></div>
+        </div>
+
+        <div id="chestStatus" class="chest-status locked">
+          <span class="chest-mini">▣</span>
+          <div><small>หีบสมบัติ</small><b id="chestLabel">อีก 10 ข้อเพื่อปลดล็อก</b></div>
+        </div>
+
+        <button id="finishEarlyBtn" class="btn btn-outline btn-block hidden">จบภารกิจและรับรางวัล</button>
+      </aside>
+
+      <section class="mission-card glass-card">
+        <div class="mission-topline">
+          <div><span class="live-dot"></span> ภารกิจกำลังดำเนินการ</div>
+          <span id="missionCounter">MISSION 01 / 25</span>
+        </div>
+
+        <div class="sign-target">
+          <small>ไปที่ป้ายหมายเลข</small>
+          <div id="signNumber" class="sign-number">--</div>
+          <p>อ่านคำถามบนป้าย แล้วเลือกคำตอบที่ถูกต้องด้านล่าง</p>
+        </div>
+
+        <div class="answer-heading">
+          <span>เลือกคำตอบ</span>
+          <small>ระบบจะไม่แสดงโจทย์บนหน้าจอนี้</small>
+        </div>
+        <div id="answerGrid" class="answer-grid">
+          <button class="answer-btn" data-option="A"><span>ก</span><b id="optionA">-</b></button>
+          <button class="answer-btn" data-option="B"><span>ข</span><b id="optionB">-</b></button>
+          <button class="answer-btn" data-option="C"><span>ค</span><b id="optionC">-</b></button>
+          <button class="answer-btn" data-option="D"><span>ง</span><b id="optionD">-</b></button>
+        </div>
+        <div id="answerFeedback" class="answer-feedback hidden"></div>
+      </section>
+    </section>
+
+    <section id="completeView" class="complete-card glass-card hidden">
+      <div id="completeIcon" class="complete-medal">★</div>
+      <div class="eyebrow">MISSION COMPLETE</div>
+      <h1 id="completeTitle">ยินดีด้วย!</h1>
+      <p id="completeText">คุณทำภารกิจสำเร็จแล้ว</p>
+      <div class="reward-room">
+        <small>จุดรับของรางวัล</small>
+        <strong>ห้อง 738</strong>
+        <span>แสดงหน้าจอนี้ให้เจ้าหน้าที่</span>
+      </div>
+      <div class="completion-stats">
+        <div><small>ตอบถูก</small><strong id="finalCorrect">0</strong></div>
+        <div><small>ระดับรางวัล</small><strong id="finalPrize">-</strong></div>
+      </div>
+      <p class="used-note">รหัสนักเรียนนี้สิ้นสุดภารกิจแล้ว และไม่สามารถเริ่มเกมใหม่ได้</p>
+      <button id="clearLocalBtn" class="btn btn-outline">ออกจากหน้าผู้เล่นนี้</button>
+    </section>
   </main>
 
-  <script type="module" src="./app.js"></script>
+  <div id="milestoneModal" class="modal-backdrop hidden" role="dialog" aria-modal="true">
+    <div class="milestone-modal">
+      <div class="chest-scene">
+        <div class="glow-ring"></div>
+        <div class="chest-emoji">🎁</div>
+      </div>
+      <div class="eyebrow">TREASURE UNLOCKED</div>
+      <h2>เปิดหีบสมบัติสำเร็จ!</h2>
+      <p>คุณตอบถูกครบ <b>10 ข้อ</b> แล้ว สามารถจบภารกิจเพื่อรับรางวัล หรือเดินหน้าต่อเพื่อพิชิตรางวัลใหญ่</p>
+      <div class="milestone-actions">
+        <button id="continueBtn" class="btn btn-primary">หาคำตอบต่อ →</button>
+        <button id="finishAt10Btn" class="btn btn-outline">จบเกมและรับรางวัล</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="toast" class="toast hidden"></div>
+  <div id="loadingOverlay" class="loading-overlay hidden"><div class="loader"></div><span>กำลังประมวลผล...</span></div>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="./config.js"></script>
+  <script src="./supabase-client.js"></script>
+  <script src="./app.js"></script>
 </body>
 </html>
