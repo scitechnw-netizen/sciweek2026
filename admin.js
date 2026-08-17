@@ -6,6 +6,7 @@
   let adminToken=sessionStorage.getItem("treasure_admin_token")||"";
   let students=[],questions=[],results=[],csvRows=[],studentOffset=0,resultOffset=0;
   let confirmAction=null;
+  let gameOpen=true;
 
   function show(el,yes=true){if(el)el.classList.toggle("hidden",!yes)}
   function loading(v){show(loadingEl,v)}
@@ -61,9 +62,32 @@
     $("statSmall").textContent=d.finished_small??0;$("statBig").textContent=d.finished_big??0;
     $("questionHealth").textContent=(d.active_questions??0)+"/129";$("signHealth").textContent=(d.active_signs??0)+"/43";
     $("playingNow").textContent=d.playing_now??0;
+    gameOpen=d.game_open!==false;
+    const card=$("gameControlCard"),btn=$("toggleGameBtn"),label=$("gameOpenLabel"),help=$("gameOpenHelp");
+    card?.classList.toggle("open",gameOpen);card?.classList.toggle("closed",!gameOpen);
+    if(label)label.textContent=gameOpen?"เปิดการเล่นเกมอยู่":"ปิดการเล่นเกมประจำวันแล้ว";
+    if(help)help.textContent=gameOpen?"นักเรียนสามารถค้นหารหัส เริ่มเกม และเล่นต่อได้ตามปกติ":"นักเรียนจะเห็นข้อความให้กลับมาเล่นใหม่วันหลัง และความคืบหน้าจะไม่หาย";
+    if(btn){btn.textContent=gameOpen?"ปิดการเล่นเกม":"เปิดการเล่นเกม";btn.classList.toggle("btn-danger",gameOpen);btn.classList.toggle("btn-primary",!gameOpen)}
   }
   async function loadDashboard(){try{const d=await arpc("hunt_admin_dashboard");if(!d?.ok)throw new Error("เซสชันหมดอายุ");renderDashboard(d)}catch(e){logoutLocal();msg(loginMsg,"เซสชันหมดอายุ กรุณาเข้าสู่ระบบใหม่")}}
   $("refreshDashboardBtn")?.addEventListener("click",loadDashboard);
+  $("toggleGameBtn")?.addEventListener("click",()=>{
+    const nextOpen=!gameOpen;
+    const title=nextOpen?"เปิดการเล่นเกม":"ปิดการเล่นเกมประจำวัน";
+    const text=nextOpen
+      ?"ยืนยันเปิดการเล่นเกมหรือไม่? นักเรียนจะสามารถเริ่มเกมและเล่นต่อจากความคืบหน้าเดิมได้ทันที"
+      :"ยืนยันปิดการเล่นเกมหรือไม่? นักเรียนจะได้รับข้อความ “ปิดการเล่นเกมประจำวัน มาเริ่มเล่นใหม่วันหลังจ้า” และความคืบหน้าจะไม่ถูกลบ";
+    openConfirm(title,text,async()=>{
+      loading(true);
+      try{
+        const d=await arpc("hunt_admin_set_game_open",{p_open:nextOpen});
+        if(!d?.ok)throw new Error(d?.message||"เปลี่ยนสถานะเกมไม่สำเร็จ");
+        gameOpen=d.game_open!==false;
+        toast(gameOpen?"เปิดการเล่นเกมแล้ว":"ปิดการเล่นเกมประจำวันแล้ว");
+        await loadDashboard();
+      }catch(err){toast(err.message,"error")}finally{loading(false)}
+    });
+  });
 
   async function loadStudents(reset=false){
     if(reset){studentOffset=0;students=[]}
@@ -180,11 +204,22 @@
   }
   function renderResults(total){
     const tb=$("resultsTableBody");
-    if(!results.length){tb.innerHTML='<tr><td colspan="7" class="empty-cell">ยังไม่มีผลการเล่น</td></tr>'}
-    else tb.innerHTML=results.map(r=>`<tr>
-      <td><strong>${safe(r.full_name)}</strong><br><span style="color:#6f889a">${safe(r.student_code)}</span></td><td>${safe(r.class_name||"-")}</td>
-      <td><strong>${r.correct_count}/25</strong></td><td>${r.total_attempts}</td><td>${statusBadge(r.status)}</td><td>${fmtDate(r.started_at)}</td>
-      <td><div class="row-actions">${r.status==="locked"?`<button class="row-btn unlock unlock-player" data-code="${safe(r.student_code)}" data-name="${safe(r.full_name)}">ปลดล็อก</button>`:""}<button class="row-btn danger reset-player" data-code="${safe(r.student_code)}" data-name="${safe(r.full_name)}">รีเซ็ต</button></div></td></tr>`).join("");
+    if(!results.length){tb.innerHTML='<tr><td colspan="8" class="empty-cell">ยังไม่มีผลการเล่น</td></tr>'}
+    else tb.innerHTML=results.map(r=>{
+      const finished=r.status==="finished_small"||r.status==="finished_big";
+      let claimHtml='<span class="claim-na">-</span>';
+      if(r.prize_claimed){
+        claimHtml=`<span class="badge green claim-badge">✓ รับรางวัลแล้ว</span><small class="claim-time">${fmtDate(r.prize_claimed_at)}</small>`;
+      }else if(finished){
+        claimHtml=`<button class="row-btn claim-prize" data-code="${safe(r.student_code)}" data-name="${safe(r.full_name)}" data-prize="${r.status==="finished_big"?"รางวัลใหญ่":"รางวัลเล็ก"}">✓ รับรางวัลแล้ว</button>`;
+      }
+      const resetHtml=r.prize_claimed?"":`<button class="row-btn danger reset-player" data-code="${safe(r.student_code)}" data-name="${safe(r.full_name)}">รีเซ็ต</button>`;
+      return `<tr>
+        <td><strong>${safe(r.full_name)}</strong><br><span style="color:#6f889a">${safe(r.student_code)}</span></td><td>${safe(r.class_name||"-")}</td>
+        <td><strong>${r.correct_count}/25</strong></td><td>${r.total_attempts}</td><td>${statusBadge(r.status)}</td>
+        <td><div class="claim-cell">${claimHtml}</div></td><td>${fmtDate(r.started_at)}</td>
+        <td><div class="row-actions">${r.status==="locked"?`<button class="row-btn unlock unlock-player" data-code="${safe(r.student_code)}" data-name="${safe(r.full_name)}">ปลดล็อก</button>`:""}${resetHtml}</div></td></tr>`;
+    }).join("");
     $("resultCountLabel").textContent=`แสดง ${results.length} จาก ${total} รายการ`;show($("loadMoreResultsBtn"),results.length<total);
   }
   let resultTimer;
@@ -193,6 +228,19 @@
   $("refreshResultsBtn")?.addEventListener("click",()=>loadResults(true).catch(e=>toast(e.message,"error")));
   $("loadMoreResultsBtn")?.addEventListener("click",()=>loadResults(false).catch(e=>toast(e.message,"error")));
   $("resultsTableBody")?.addEventListener("click",e=>{
+    const claim=e.target.closest(".claim-prize");
+    if(claim){
+      openConfirm("ยืนยันการรับรางวัล",`ยืนยันว่า ${claim.dataset.name} (${claim.dataset.code}) ได้รับ${claim.dataset.prize}แล้วใช่หรือไม่? เมื่อยืนยัน ระบบจะบันทึกเพื่อป้องกันการรับซ้ำ`,async()=>{
+        loading(true);
+        try{
+          const d=await arpc("hunt_admin_claim_prize",{p_student_code:claim.dataset.code});
+          if(!d?.ok)throw new Error(d?.message||"บันทึกรับรางวัลไม่สำเร็จ");
+          toast(d.already_claimed?"รายการนี้รับรางวัลไปแล้ว":"บันทึกว่าได้รับรางวัลแล้ว");
+          await loadResults(true);await loadDashboard();
+        }catch(err){toast(err.message,"error")}finally{loading(false)}
+      });
+      return;
+    }
     const unlock=e.target.closest(".unlock-player");
     if(unlock){
       openConfirm("ปลดล็อกผู้เล่น",`ปลดล็อก ${unlock.dataset.name} (${unlock.dataset.code}) ใช่หรือไม่? นักเรียนจะเล่นต่อจากข้อเดิม และได้โอกาสตอบข้อนี้ใหม่ 2 ครั้ง`,async()=>{
@@ -212,7 +260,7 @@
     });
   });
   $("exportResultsBtn")?.addEventListener("click",()=>{
-    const h=["student_code","full_name","class_name","correct_count","total_attempts","status","started_at","finished_at"];
+    const h=["student_code","full_name","class_name","correct_count","total_attempts","status","prize_claimed","prize_claimed_at","started_at","finished_at"];
     const lines=[h.join(","),...results.map(r=>h.map(k=>escCSV(r[k])).join(","))];
     const blob=new Blob(["\uFEFF"+lines.join("\n")],{type:"text/csv;charset=utf-8"}),a=document.createElement("a");
     a.href=URL.createObjectURL(blob);a.download="treasure-hunt-results.csv";a.click();URL.revokeObjectURL(a.href);

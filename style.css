@@ -99,3 +99,19 @@ button,input,textarea,select{font:inherit}button,a{ -webkit-tap-highlight-color:
 }
 .locked-retry-btn{margin-top:18px;min-width:220px;font-size:15px}
 @media(max-width:650px){.locked-retry-btn{width:100%;font-size:18px;padding:16px}}
+
+
+/* ==========================================================
+   UPDATE v4 — Daily game control + prize claim
+   ========================================================== */
+.closed-game-card{max-width:720px;margin:70px auto;padding:50px 42px;text-align:center;border-radius:28px}
+.closed-game-icon{width:86px;height:86px;margin:0 auto 18px;border-radius:26px;display:grid;place-items:center;font-size:42px;background:rgba(85,215,208,.08);border:1px solid rgba(85,215,208,.20)}
+.closed-game-card h1{font-size:38px;margin:10px 0 10px}.closed-game-card>p{font-size:23px;color:#f6d98f;font-weight:800;line-height:1.65;margin:0 auto 18px}
+.closed-game-note{max-width:570px;margin:0 auto;padding:14px 18px;border-radius:14px;color:#a9bdca;background:rgba(255,255,255,.035);border:1px solid var(--line);font-size:13px;line-height:1.65}
+.closed-game-check{margin-top:20px;min-width:220px}
+.game-control-card{display:flex;align-items:center;justify-content:space-between;gap:18px;padding:16px 18px;margin:14px 0 16px;border-radius:16px;border:1px solid var(--line);background:rgba(255,255,255,.025)}
+.game-control-card.open{border-color:rgba(91,209,154,.25);background:rgba(91,209,154,.055)}
+.game-control-card.closed{border-color:rgba(255,125,130,.28);background:rgba(255,125,130,.065)}
+.game-control-copy small{display:block;color:#7590a2;font-size:8.5px;letter-spacing:.12em}.game-control-copy strong{display:block;margin:3px 0;font-size:13px}.game-control-copy span{display:block;color:#8fa5b5;font-size:9.5px;line-height:1.5}
+.claim-cell{display:flex;flex-direction:column;align-items:flex-start;gap:4px;min-width:105px}.row-btn.claim-prize{color:#a7e3c5;border-color:rgba(91,209,154,.28);background:rgba(91,209,154,.07);font-weight:800}.claim-time{display:block;color:#71899a;font-size:8px;white-space:nowrap}.claim-na{color:#647b8d}.claim-badge{white-space:nowrap}
+@media(max-width:650px){.closed-game-card{margin:30px auto;padding:34px 18px}.closed-game-card h1{font-size:31px}.closed-game-card>p{font-size:21px}.closed-game-note{font-size:15px}.closed-game-check{width:100%;font-size:18px;padding:16px}.game-control-card{align-items:stretch;flex-direction:column}.game-control-card .btn{width:100%}}

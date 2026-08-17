@@ -71,6 +71,14 @@
         <div class="admin-grid-2">
           <article class="admin-panel">
             <div class="panel-head"><div><small>GAME STATUS</small><h2>สถานะระบบเกม</h2></div><button id="refreshDashboardBtn" class="icon-btn">↻</button></div>
+            <div id="gameControlCard" class="game-control-card open">
+              <div class="game-control-copy">
+                <small>DAILY GAME CONTROL</small>
+                <strong id="gameOpenLabel">เปิดการเล่นเกมอยู่</strong>
+                <span id="gameOpenHelp">นักเรียนสามารถค้นหารหัส เริ่มเกม และเล่นต่อได้ตามปกติ</span>
+              </div>
+              <button id="toggleGameBtn" class="btn btn-danger">ปิดการเล่นเกม</button>
+            </div>
             <div class="system-health">
               <div><span class="health-dot ok"></span><b>คลังข้อสอบ</b><strong id="questionHealth">0/129</strong></div>
               <div><span class="health-dot ok"></span><b>ป้ายพร้อมใช้งาน</b><strong id="signHealth">0/43</strong></div>
@@ -149,8 +157,8 @@
           </div>
           <div class="table-wrap">
             <table class="data-table">
-              <thead><tr><th>นักเรียน</th><th>ห้อง</th><th>ตอบถูก</th><th>ครั้งที่ตอบ</th><th>สถานะ</th><th>เริ่มเล่น</th><th></th></tr></thead>
-              <tbody id="resultsTableBody"><tr><td colspan="7" class="empty-cell">กำลังโหลด...</td></tr></tbody>
+              <thead><tr><th>นักเรียน</th><th>ห้อง</th><th>ตอบถูก</th><th>ครั้งที่ตอบ</th><th>สถานะ</th><th>การรับรางวัล</th><th>เริ่มเล่น</th><th></th></tr></thead>
+              <tbody id="resultsTableBody"><tr><td colspan="8" class="empty-cell">กำลังโหลด...</td></tr></tbody>
             </table>
           </div>
           <div class="table-footer"><span id="resultCountLabel">0 รายการ</span><button id="loadMoreResultsBtn" class="btn btn-outline btn-small">โหลดเพิ่ม</button></div>

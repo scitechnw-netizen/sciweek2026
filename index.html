@@ -28,7 +28,16 @@
       <p>กรุณาใส่ SUPABASE_URL และ SUPABASE_ANON_KEY ในไฟล์ <b>config.js</b></p>
     </section>
 
-    <section id="landingView" class="landing-grid">
+    <section id="gameClosedView" class="closed-game-card glass-card hidden">
+      <div class="closed-game-icon">🌙</div>
+      <div class="eyebrow">GAME CLOSED FOR TODAY</div>
+      <h1>ปิดการเล่นเกมประจำวัน</h1>
+      <p id="gameClosedMessage">มาเริ่มเล่นใหม่วันหลังจ้า</p>
+      <div class="closed-game-note">ความคืบหน้าของผู้เล่นที่เริ่มเกมแล้วจะยังถูกเก็บไว้ เมื่อเปิดระบบอีกครั้งสามารถเล่นต่อจากจุดเดิมได้</div>
+      <button id="checkGameOpenBtn" type="button" class="btn btn-primary closed-game-check">ตรวจสอบสถานะเกม</button>
+    </section>
+
+    <section id="landingView" class="landing-grid hidden">
       <div class="hero-copy">
         <div class="eyebrow">MISSION 01 · FIND THE SIGNS</div>
         <h1>ตามล่าหา<br><span>สมบัติวิทยาศาสตร์</span></h1>
